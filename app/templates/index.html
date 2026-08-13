@@ -43,25 +43,6 @@
       <div class="tab-page active" data-page="data">
         <section class="group">
           <h3 class="group-title">Data</h3>
-          <div class="field-row">
-            <button class="btn btn-secondary" id="btnSynthetic" type="button"><i data-lucide="flask-conical"></i>Generate test data</button>
-          </div>
-          <div class="range-toggle" id="rangeToggle" role="group" aria-label="Date range">
-            <button class="range-opt active" data-range="all" type="button"><i data-lucide="layers"></i>All data</button>
-            <button class="range-opt" data-range="custom" type="button"><i data-lucide="calendar-days"></i>Custom date</button>
-          </div>
-          <div class="field-grid" id="dateFields">
-            <label class="field">
-              <span>Start (DD/MM/YYYY)</span>
-              <input type="text" id="synStart" value="01/01/2026" placeholder="DD/MM/YYYY">
-            </label>
-            <label class="field">
-              <span>End (DD/MM/YYYY)</span>
-              <input type="text" id="synEnd" value="01/06/2026" placeholder="DD/MM/YYYY">
-            </label>
-          </div>
-          <p class="hint">All data (default): test data and uploaded M1 CSVs backtest over the entire dataset. Custom: only bars inside the window are generated and backtested, uploaded data included.</p>
-          <div class="divider-label">or</div>
           <label class="field">
             <span><i data-lucide="file-up"></i>Upload M1 CSV</span>
             <input type="file" id="fileUpload" accept=".csv">
@@ -93,7 +74,7 @@
               </select>
             </label>
           </div>
-          <p class="hint">Leave <code>auto</code> to infer the timezone from weekend gaps (gold closes ~21:00 UTC Fri, reopens ~22:00 UTC Sun). If detection fails, set the source's raw timezone (e.g. <code>EET</code>) — the loader will not silently guess. The <code>All data / Custom date</code> window above gates every backtest, uploaded M1 CSVs included.</p>
+          <p class="hint">Leave <code>auto</code> to infer the timezone from weekend gaps (gold closes ~21:00 UTC Fri, reopens ~22:00 UTC Sun). If detection fails, set the source's raw timezone (e.g. <code>EET</code>) — the loader will not silently guess. Backtests run over the entire loaded dataset.</p>
           <div class="dataset-meta" id="datasetMeta">No dataset loaded</div>
         </section>
       </div>

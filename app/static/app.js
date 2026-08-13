@@ -21,19 +21,7 @@
     return (Number(n) * 100).toFixed(1) + "%";
   }
 
-  function toISODate(v){
-    const m = v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
-    return v.trim();
-  }
-
-  function currentRange(){
-    const el = document.querySelector("#rangeToggle .range-opt.active");
-    return el ? el.dataset.range : "all";
-  }
-
   function readParams(){
-    const customOn = currentRange() === "custom";
     return {
       dataset_id: currentDatasetId,
       session_open_utc: $("sessionOpen").value || "00:00",
@@ -46,8 +34,6 @@
       slippage_pips: parseFloat($("slippagePips").value),
       session_max_hours: parseFloat($("sessionMaxHours").value),
       skip_weekends: $("skipWeekends").checked,
-      start_date: customOn ? toISODate($("synStart").value) : null,
-      end_date: customOn ? toISODate($("synEnd").value) : null,
     };
   }
 
@@ -56,12 +42,9 @@
     const entryDesc = p.entry_mode === "market"
       ? "market entry at the next bar's open after the breakout candle closes"
       : `a resting limit order back at the range boundary, expiring after ${p.breakout_search_minutes} min if unfilled`;
-    const windowDesc = (p.start_date && p.end_date)
-      ? `Dated ${p.start_date} → ${p.end_date} (UTC).`
-      : "Over the full loaded dataset.";
 
     $("summaryText").innerHTML =
-      `${windowDesc} ` +
+      `Over the full loaded dataset. ` +
       `Mark the <b>${p.range_minutes}-minute</b> opening range starting at <b>${p.session_open_utc} UTC</b>. ` +
       `If an M1 candle closes outside the range within <b>${p.breakout_search_minutes} minutes</b> of session open, take ` +
       `${entryDesc}. ` +
@@ -76,30 +59,6 @@
     const el = $("datasetMeta");
     if (el){ el.textContent = `${data.symbol} · ${data.rows.toLocaleString()} bars · ${range} UTC`; }
     setStatus(`${data.symbol} · ${data.rows.toLocaleString()} bars · ${range}`, true);
-  }
-
-  async function handleSynthetic(){
-    const btn = $("btnSynthetic");
-    btn.disabled = true;
-    btn.textContent = "Generating…";
-    try{
-      const form = new FormData();
-      form.append("start_date", toISODate($("synStart").value));
-      form.append("end_date", toISODate($("synEnd").value));
-      form.append("seed", "42");
-
-      const res = await fetch("/api/data/synthetic", { method: "POST", body: form });
-      if (!res.ok){ throw new Error((await res.json()).detail || "Failed to generate data"); }
-      const data = await res.json();
-      currentDatasetId = data.dataset_id;
-      showDatasetMeta(data);
-      $("btnGenerate").disabled = false;
-    } catch(e){
-      alert("Error: " + e.message);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Generate test data";
-    }
   }
 
   async function handleUpload(e){
@@ -310,10 +269,6 @@
       alert("Load a dataset first.");
       return;
     }
-    if (currentRange() === "custom" && (!$("synStart").value.trim() || !$("synEnd").value.trim())){
-      alert("Enter both Start and End dates for the custom range.");
-      return;
-    }
     const btn = $("btnGenerate");
     btn.disabled = true;
     btn.classList.add("loading");
@@ -391,20 +346,6 @@
     window.location.href = `/api/backtest/export/${currentJobId}`;
   }
 
-  // All data / Custom date range toggle
-  const rangeOpts = document.querySelectorAll("#rangeToggle .range-opt");
-  rangeOpts.forEach(btn => btn.addEventListener("click", () => {
-    rangeOpts.forEach(o => {
-      const a = o === btn;
-      o.classList.toggle("active", a);
-      o.setAttribute("aria-checked", a ? "true" : "false");
-    });
-    const on = currentRange() === "custom";
-    document.querySelectorAll("#dateFields input").forEach(inp => { inp.disabled = !on; });
-    updateSummary();
-  }));
-  document.querySelectorAll("#dateFields input").forEach(inp => { inp.disabled = true; });
-
   // Tab switching in the params sidebar
   const paramTabs = document.querySelectorAll("#paramTabs .tab");
   const paramPages = document.querySelectorAll(".params-panel .tab-page");
@@ -423,7 +364,6 @@
   });
 
   // Wire up events
-  $("btnSynthetic").addEventListener("click", handleSynthetic);
   $("fileUpload").addEventListener("change", handleUpload);
   $("btnGenerate").addEventListener("click", handleGenerate);
   $("btnExport").addEventListener("click", handleExport);
