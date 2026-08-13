@@ -36,7 +36,18 @@ app/
 The engine (`app/engine/`) is framework-agnostic — it can be imported and
 used directly in a script or notebook without FastAPI.
 
-## Running it
+## Try it online (hosted)
+
+No installation needed. Open the hosted app, upload your M1 gold CSV, and run:
+
+**https://orb-backtest-script--anasbassoumi1.replit.app/**
+
+1. Open the link.
+2. Set "Raw timestamp TZ" to your CSV's source timezone (or leave `auto`).
+3. Upload your M1 gold CSV (`timestamp, open, high, low, close` columns).
+4. Adjust strategy params if you like, then click **Generate backtest**.
+
+## Running it locally
 
 One command (auto-creates a venv, installs deps, reads `PORT` env var, defaults to 8000):
 
