@@ -406,10 +406,10 @@
       : statCardHtml(label, "—", "neutral");
     if (bw){
       cards.push(
+        pairCard("Best / worst time", bw.bestSlot, bw.worstSlot),
         pairCard("Best / worst day", bw.bestDow, bw.worstDow),
         pairCard("Best / worst month", bw.bestMonth, bw.worstMonth),
-        pairCard("Best / worst year", bw.bestYear, bw.worstYear),
-        pairCard("Best / worst time", bw.bestSlot, bw.worstSlot));
+        pairCard("Best / worst year", bw.bestYear, bw.worstYear));
     } else {
       ["day", "month", "year", "time"].forEach(s =>
         cards.push(statCardHtml("Best / worst " + s, "—", "neutral")));
