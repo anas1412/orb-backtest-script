@@ -343,17 +343,33 @@
 
   function bestWorstPeriods(trades){
     if (!trades || trades.length === 0) return null;
-    const byDow = {}, byMonth = {};
+    const byDow = {}, byMonth = {}, byYear = {}, bySlot = {};
     trades.forEach(t => {
       const date = new Date(t.date + "T00:00:00Z");
       const dow = date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
       byDow[dow] = (byDow[dow] || 0) + t.r_multiple;
       const mk = date.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
       byMonth[mk] = (byMonth[mk] || 0) + t.r_multiple;
+      const year = String(date.getUTCFullYear());
+      byYear[year] = (byYear[year] || 0) + t.r_multiple;
+      if (t.entry_time_utc){
+        const e = new Date(t.entry_time_utc);
+        if (!isNaN(e.getTime())){
+          const slot = String(e.getUTCHours()).padStart(2, "0") + ":" +
+            String(Math.floor(e.getUTCMinutes() / 15) * 15).padStart(2, "0");
+          bySlot[slot] = (bySlot[slot] || 0) + t.r_multiple;
+        }
+      }
     });
     const best = o => Object.entries(o).reduce((a, b) => b[1] > a[1] ? b : a);
     const worst = o => Object.entries(o).reduce((a, b) => b[1] < a[1] ? b : a);
-    return { bestDow: best(byDow), worstDow: worst(byDow), bestMonth: best(byMonth), worstMonth: worst(byMonth) };
+    return {
+      bestDow: best(byDow), worstDow: worst(byDow),
+      bestMonth: best(byMonth), worstMonth: worst(byMonth),
+      bestYear: best(byYear), worstYear: worst(byYear),
+      bestSlot: Object.keys(bySlot).length ? best(bySlot) : null,
+      worstSlot: Object.keys(bySlot).length ? worst(bySlot) : null,
+    };
   }
 
   function renderStats(stats, sim){
@@ -381,22 +397,21 @@
       statCardHtml("Longest loss streak", stats.longest_loss_streak, "neg"));
 
     const bw = bestWorstPeriods(lastResult.trades);
+    const pairCard = (label, bestPair, worstPair) => bestPair
+      ? statCardHtml(label,
+          `<span class="bw-big">${bestPair[0]} · ${(bestPair[1] > 0 ? "+" : "")}${fmt(bestPair[1])}R</span>`,
+          "pos",
+          `<span class="stat-sub bw-worst">Worst: ${worstPair[0]} · ${fmt(worstPair[1])}R</span>`)
+      : statCardHtml(label, "—", "neutral");
     if (bw){
-      const [bd, wd] = [bw.bestDow, bw.worstDow];
-      const [bm, wm] = [bw.bestMonth, bw.worstMonth];
       cards.push(
-        statCardHtml("Best / worst day",
-          `<span class="bw-big">${bd[0]} · ${(bd[1] > 0 ? "+" : "")}${fmt(bd[1])}R</span>`,
-          "pos",
-          `<span class="stat-sub bw-worst">Worst day: ${wd[0]} · ${fmt(wd[1])}R</span>`),
-        statCardHtml("Best / worst month",
-          `<span class="bw-big">${bm[0]} · ${(bm[1] > 0 ? "+" : "")}${fmt(bm[1])}R</span>`,
-          "pos",
-          `<span class="stat-sub bw-worst">Worst month: ${wm[0]} · ${fmt(wm[1])}R</span>`));
+        pairCard("Best / worst day", bw.bestDow, bw.worstDow),
+        pairCard("Best / worst month", bw.bestMonth, bw.worstMonth),
+        pairCard("Best / worst year", bw.bestYear, bw.worstYear),
+        pairCard("Best / worst time", bw.bestSlot, bw.worstSlot));
     } else {
-      cards.push(
-        statCardHtml("Best / worst day", "—", "neutral"),
-        statCardHtml("Best / worst month", "—", "neutral"));
+      ["day", "month", "year", "time"].forEach(s =>
+        cards.push(statCardHtml("Best / worst " + s, "—", "neutral")));
     }
     $("statGrid").innerHTML = cards.join("");
   }
