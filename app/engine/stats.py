@@ -127,8 +127,9 @@ def trades_to_dataframe(result: BacktestResult) -> pd.DataFrame:
             "sl_price": round(t.sl_price, 4),
             "tp_price": round(t.tp_price, 4),
             "sl_moved": t.sl_moved,
-            # Final stop in force at exit: the moved stop when the half-TP
-            # rule fired, otherwise the original stop. Always a number so the
+            # Final stop in force at exit: the last ladder step's stop when
+            # the ladder advanced, otherwise the original stop. Always a
+            # number so the
             # JSON stream never carries NaN (json.dumps would emit a bare
             # "NaN" token, which is invalid JSON for browsers).
             "sl_final": round(t.sl_final, 4),

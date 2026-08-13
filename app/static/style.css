@@ -183,6 +183,41 @@ body{
 }
 .field-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; min-width:0; }
 
+.ladder-row{
+  display:flex; align-items:center; gap:6px; margin-bottom:6px; min-width:0;
+}
+.ladder-row input{
+  width: 72px; min-width:0; flex-shrink:1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 9px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+.ladder-row input:focus{ outline:none; border-color: var(--gold); }
+.ladder-row input:first-child{ flex:1.2; }
+.ladder-arrow{
+  font-size: 10.5px; color: var(--text-dim); white-space:nowrap;
+  font-family: var(--font-mono);
+}
+.ladder-remove{
+  width: 26px; height: 26px; flex-shrink:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  background: transparent; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: 14px; line-height:1; cursor:pointer; padding:0;
+}
+.ladder-remove:hover{ color: #e05c5c; border-color: #e05c5c; }
+.btn-ladder-add{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  background: transparent; color: var(--gold);
+  border: 1px dashed var(--border); border-radius: var(--radius);
+  padding: 6px 10px; font-size: 12px; cursor:pointer; margin-bottom:10px;
+}
+.btn-ladder-add:hover{ border-color: var(--gold); }
+
 .checkbox-field{ flex-direction:row; align-items:center; gap:8px; }
 .checkbox-field input{ width:auto; padding:0; }
 
@@ -401,6 +436,9 @@ body{
   font-size: 11px;
   color: var(--text-faint);
   word-break: break-word;
+}
+.dataset-meta .meta-elapsed{
+  color: var(--gold);
 }
 .dataset-meta .meta-file-list{
   display: flex;

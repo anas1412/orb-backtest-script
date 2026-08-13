@@ -8,14 +8,14 @@ import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 
 import pandas as pd
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 import io
 
 from app.engine.data_loader import (
@@ -69,14 +69,34 @@ class BacktestParams(BaseModel):
     entry_mode: str = "market"
     sl_pct_of_range: float = Field(0.5, ge=0.0, le=5.0)
     tp_rr: float = Field(2.0, gt=0.0)
-    sl_move_on_half_tp: Literal["none", "breakeven", "half_risk"] = "half_risk"
-    sl_move_trigger_pct: float = Field(0.5, gt=0.0, le=1.0)
+    sl_ladder: list[list[float]] = Field(default_factory=lambda: [[1.0, -0.5]])
     spread_pips: float = Field(0.0, ge=0.0)
     slippage_pips: float = Field(0.0, ge=0.0)
     session_max_hours: float = Field(20.0, gt=0.0)
     skip_weekends: bool = True
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check_ladder(self):
+        # Order never matters: sort by trigger so the engine fires steps in
+        # ascending order regardless of how they were entered.
+        self.sl_ladder.sort(key=lambda s: s[0])
+        prev_sl = None
+        for step in self.sl_ladder:
+            if len(step) != 2:
+                raise ValueError("Each ladder step must be [trigger_R, sl_R].")
+            trigger, sl = step
+            if trigger <= 0:
+                raise ValueError("Ladder triggers must be greater than 0.")
+            if sl < -1.0:
+                raise ValueError("Ladder stops cannot be looser than the initial -1.0R stop.")
+            if prev_sl is not None and sl < prev_sl:
+                raise ValueError("Ladder stops must be non-decreasing (never looser than a previous step).")
+            if sl >= trigger:
+                raise ValueError("A ladder stop cannot sit at or beyond its own trigger.")
+            prev_sl = sl
+        return self
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -220,8 +240,7 @@ async def run_backtest_endpoint(p: BacktestParams):
         entry_mode=p.entry_mode,
         sl_pct_of_range=p.sl_pct_of_range,
         tp_rr=p.tp_rr,
-        sl_move_on_half_tp=p.sl_move_on_half_tp,
-        sl_move_trigger_pct=p.sl_move_trigger_pct,
+        sl_ladder=tuple((float(a), float(b)) for a, b in p.sl_ladder),
         spread_pips=p.spread_pips,
         slippage_pips=p.slippage_pips,
         session_max_hours=p.session_max_hours,

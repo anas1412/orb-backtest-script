@@ -78,12 +78,16 @@ source's raw timestamp timezone before uploading.
   `1.0` lands exactly on the boundary opposite the breakout side.
 - `tp_rr = 1.0` produces exactly ±1.0 R outcomes on TP/SL hits (before
   execution costs).
-- `sl_move_on_half_tp` moves the stop when price reaches a configurable
-  fraction of the TP distance (`sl_move_trigger_pct`, default 50% of the
-  target): `breakeven` puts it exactly at entry, `half_risk` puts it at
-  half the original risk distance. The moved stop applies from the next
-  candle; a bar touching both the trigger and the old stop counts as the
-  old stop (conservative), giving 0.0R / -0.5R exits respectively.
+- `sl_ladder` (default `[[1.0, -0.5]]`) moves the
+  stop step by step as price advances. Each step is `[trigger_R, sl_R]`: when
+  price reaches `trigger_R` (R = risk distance from entry), the stop moves to
+  `sl_R` (negative = below entry, 0 = breakeven, positive = locked profit).
+  R is always the ORIGINAL risk distance, fixed for the whole trade — a moved
+  stop never becomes the reference for later steps. Steps fire in ascending
+  trigger order (order of entry doesn't matter). The moved stop applies
+  from the next candle; a bar touching both a trigger
+  and the old stop counts as the old stop (conservative), and a bar racing
+  across several triggers applies the highest reached step. Empty = no moves.
 - Limit-mode entries fill exactly at the broken range boundary.
 - Trades left open are force-closed at `session_max_hours` (default 20h)
   with `exit_reason = "timeout"`.

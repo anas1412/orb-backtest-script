@@ -53,50 +53,46 @@ class BacktestResult:
     params: Params | None = None
 
 
-def _half_tp_levels(setup, params: Params) -> tuple[float | None, float | None]:
+def _ladder_levels(setup, params: Params) -> list[tuple[float, float]]:
     """
-    Stop-management levels for the half-TP rule.
+    Stop-management levels for the stop ladder.
 
-    Returns (trigger_price, moved_sl_price), or (None, None) when the rule is
-    disabled. The trigger is the price that means the trade has banked
-    `sl_move_trigger_pct` of the distance to TP (default 50%): entry +-
-    sl_move_trigger_pct * tp_rr * risk_distance.
+    Returns a sorted list of (trigger_price, sl_price) pairs, one per ladder
+    step, or an empty list when the ladder is disabled. The trigger is the
+    price meaning the trade has reached `trigger_R` of the ORIGINAL risk
+    distance from entry; the moved stop sits at `sl_R_from_entry` risk
+    distances from entry (0.0 = breakeven). All levels are computed once from
+    entry, so a moved stop never becomes the reference for later steps.
+    Mirrors automatically for shorts.
     """
-    if params.sl_move_on_half_tp == "none":
-        return None, None
-
-    trigger_dist = params.sl_move_trigger_pct * params.tp_rr * setup.risk_distance
-    if setup.direction == "long":
-        trigger = setup.entry_price + trigger_dist
-        if params.sl_move_on_half_tp == "breakeven":
-            moved = setup.entry_price
-        else:  # half_risk: half the original risk distance away from entry
-            moved = setup.entry_price - 0.5 * setup.risk_distance
-    else:
-        trigger = setup.entry_price - trigger_dist
-        if params.sl_move_on_half_tp == "breakeven":
-            moved = setup.entry_price
+    steps = []
+    for trigger_r, sl_r in sorted(params.sl_ladder):
+        if setup.direction == "long":
+            trigger = setup.entry_price + trigger_r * setup.risk_distance
+            moved = setup.entry_price + sl_r * setup.risk_distance
         else:
-            moved = setup.entry_price + 0.5 * setup.risk_distance
-    return trigger, moved
+            trigger = setup.entry_price - trigger_r * setup.risk_distance
+            moved = setup.entry_price - sl_r * setup.risk_distance
+        steps.append((trigger, moved))
+    return steps
 
 
 def _simulate_exit(df: pd.DataFrame, setup, params: Params) -> tuple[float, pd.Timestamp, ExitReason, bool, float]:
     """Walk forward candle-by-candle from entry, checking SL/TP touches, then timeout.
 
-    When `params.sl_move_on_half_tp` is set, the stop is moved once price
-    reaches `sl_move_trigger_pct` (default 50%) of the TP distance. The moved
-    stop only takes effect from the NEXT bar after the trigger bar
-    (conservative: a single bar that touches both the trigger and the old
-    stop resolves to the old stop, consistent with the same-bar SL/TP
-    convention).
+    When `params.sl_ladder` is non-empty, the stop moves each time price
+    reaches a step's trigger. Each moved stop only takes effect from the NEXT
+    bar after the trigger bar (conservative: a single bar that touches both
+    the trigger and the old stop resolves to the old stop, consistent with
+    the same-bar SL/TP convention). Steps advance monotonically, so a bar
+    racing across several triggers applies the highest reached step directly.
     """
     deadline = setup.entry_time + timedelta(hours=params.session_max_hours)
     future = df.loc[
         (df["timestamp"] > setup.entry_time) & (df["timestamp"] <= deadline)
     ].sort_values("timestamp")
 
-    trigger, moved_sl = _half_tp_levels(setup, params)
+    ladder = _ladder_levels(setup, params)
     current_sl = setup.sl_price
     sl_moved = False
 
@@ -128,12 +124,18 @@ def _simulate_exit(df: pd.DataFrame, setup, params: Params) -> tuple[float, pd.T
             exit_price = _apply_costs(setup.tp_price, setup.direction, is_entry=False, params=params)
             return exit_price, bar["timestamp"], "tp", sl_moved, current_sl
 
-        # Stop-management: the moved stop only takes effect from the NEXT bar.
-        if not sl_moved and trigger is not None:
+        # Stop-management: ladder triggers. The moved stop only takes effect
+        # from the NEXT bar. Steps are ordered by trigger, so a bar racing
+        # across several triggers advances through all of them and the highest
+        # reached step's stop wins (monotonic, so the result is unambiguous).
+        while ladder:
+            trigger, moved_sl = ladder[0]
             touched = hi >= trigger if setup.direction == "long" else lo <= trigger
-            if touched:
-                sl_moved = True
-                current_sl = moved_sl
+            if not touched:
+                break
+            sl_moved = True
+            current_sl = moved_sl
+            ladder.pop(0)
 
     # Timeout: force-close at the last available price at/after the deadline,
     # or the last bar in the dataset if we ran out of data first.

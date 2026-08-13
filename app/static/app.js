@@ -21,6 +21,13 @@
     return (Number(n) * 100).toFixed(1) + "%";
   }
 
+  function fmtElapsed(ms){
+    if (ms < 1000) return Math.round(ms) + "ms";
+    const s = ms / 1000;
+    if (s < 60) return s.toFixed(1) + "s";
+    return Math.floor(s / 60) + "m " + Math.round(s % 60) + "s";
+  }
+
   function readParams(){
     return {
       dataset_id: currentDatasetId,
@@ -30,13 +37,22 @@
       entry_mode: $("entryMode").value,
       sl_pct_of_range: parseFloat($("slPct").value),
       tp_rr: parseFloat($("tpRR").value),
-      sl_move_on_half_tp: $("slMove").value,
-      sl_move_trigger_pct: parseInt($("slMovePct").value, 10) / 100,
+      sl_ladder: readLadder(),
       spread_pips: parseFloat($("spreadPips").value),
       slippage_pips: parseFloat($("slippagePips").value),
       session_max_hours: parseFloat($("sessionMaxHours").value),
       skip_weekends: $("skipWeekends").checked,
     };
+  }
+
+  function readLadder(){
+    const rows = [];
+    document.querySelectorAll("#ladderRows .ladder-row").forEach(row => {
+      const trigger = parseFloat(row.querySelector(".ladder-trigger").value);
+      const sl = parseFloat(row.querySelector(".ladder-sl").value);
+      if (!isNaN(trigger) && !isNaN(sl)) rows.push([trigger, sl]);
+    });
+    return rows;
   }
 
   function updateSummary(){
@@ -52,11 +68,21 @@
       `${entryDesc}. ` +
       `Stop loss sits at <b>${p.sl_pct_of_range}× range</b> from the midpoint ` +
       `(0.5 = exact midpoint), take profit at <b>${p.tp_rr}R</b>. ` +
-      (p.sl_move_on_half_tp !== "none"
-        ? `When price reaches ${Math.round(p.sl_move_trigger_pct * 100)}% of the target, the stop moves to <b>${p.sl_move_on_half_tp === "breakeven" ? "breakeven" : "half risk"}</b>. `
-        : "") +
+      ladderSummary(p.sl_ladder) +
       `Trades are force-closed after <b>${p.session_max_hours}h</b> if neither level is hit. ` +
       (p.skip_weekends ? "Weekends are skipped." : "Weekends are included.");
+  }
+
+  function ladderSummary(ladder){
+    if (ladder.length === 0){
+      return "The stop stays at its initial level for the whole trade. ";
+    }
+    const sorted = [...ladder].sort((a, b) => a[0] - b[0]);
+    const parts = sorted.map(([trigger, sl]) => {
+      const slLabel = sl === 0 ? "breakeven" : (sl > 0 ? "+" : "") + sl + "R";
+      return `${trigger}R → ${slLabel}`;
+    });
+    return `As price advances, the stop moves: <b>${parts.join(" · ")}</b>. `;
   }
 
   function showDatasetMeta(data){
@@ -69,6 +95,7 @@
       el.innerHTML =
         `${data.symbol} · ${nFiles} file${nFiles === 1 ? "" : "s"} · ` +
         `${data.rows.toLocaleString()} bars · ${range} UTC` +
+        `<span class="meta-elapsed" id="metaElapsed"></span>` +
         (perFile ? `<span class="meta-file-list">${perFile}</span>` : "");
     }
     setStatus(`${data.symbol} · ${data.rows.toLocaleString()} bars · ${range}`, true);
@@ -350,6 +377,7 @@
     btn.disabled = true;
     btn.classList.add("loading");
     btn.querySelector(".btn-label").textContent = "Running backtest…";
+    let elapsedTimer = null;
 
     try{
       const params = readParams();
@@ -372,6 +400,13 @@
       const progressLabel = $("progressLabel");
       progressWrap.hidden = false;
 
+      const t0 = performance.now();
+      let pct = 0;
+      const setElapsed = () => {
+        progressLabel.textContent = "Backtesting… " + pct + "% · " + fmtElapsed(performance.now() - t0);
+      };
+      elapsedTimer = setInterval(setElapsed, 200);
+
       let data = null;
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -387,12 +422,16 @@
           if (!line) continue;
           const msg = JSON.parse(line);
           if (msg.type === "progress"){
-            const pct = msg.total ? Math.min(99, Math.round(msg.done / msg.total * 100)) : 0;
+            pct = msg.total ? Math.min(99, Math.round(msg.done / msg.total * 100)) : 0;
             progressBar.style.width = pct + "%";
-            progressLabel.textContent = "Backtesting… " + pct + "%";
+            setElapsed();
           } else if (msg.type === "done"){
+            clearInterval(elapsedTimer);
             progressBar.style.width = "100%";
-            progressLabel.textContent = "Backtesting… 100%";
+            pct = 100;
+            progressLabel.textContent = "Backtesting… 100% · " + fmtElapsed(performance.now() - t0);
+            const elapsedEl = $("metaElapsed");
+            if (elapsedEl) elapsedEl.textContent = " · " + fmtElapsed(performance.now() - t0);
             data = msg.result;
           } else if (msg.type === "error"){
             throw new Error(msg.detail || "Backtest failed");
@@ -414,6 +453,7 @@
     } catch(e){
       alert("Error: " + e.message);
     } finally {
+      if (elapsedTimer) clearInterval(elapsedTimer);
       btn.disabled = false;
       btn.classList.remove("loading");
       btn.querySelector(".btn-label").textContent = "Generate backtest";
@@ -450,6 +490,37 @@
   $("btnClear").addEventListener("click", handleClear);
   $("btnDemo").addEventListener("click", handleDemo);
   $("btnExport").addEventListener("click", handleExport);
+
+  // Stop ladder editor
+  function syncLadderEmpty(){
+    $("ladderEmpty").style.display = $("ladderRows").children.length === 0 ? "" : "none";
+  }
+
+  function addLadderRow(trigger, sl){
+    const row = document.createElement("div");
+    row.className = "ladder-row";
+    row.innerHTML = `
+      <input type="number" class="ladder-trigger" min="0.05" step="0.05" value="${trigger}">
+      <span class="ladder-arrow">R → stop R</span>
+      <input type="number" class="ladder-sl" step="0.05" value="${sl}">
+      <button type="button" class="ladder-remove" title="Remove step">×</button>`;
+    row.querySelectorAll("input").forEach(el => el.addEventListener("input", updateSummary));
+    row.querySelector(".ladder-remove").addEventListener("click", () => {
+      row.remove();
+      syncLadderEmpty();
+      updateSummary();
+    });
+    $("ladderRows").appendChild(row);
+  }
+
+  $("ladderAdd").addEventListener("click", () => {
+    addLadderRow(0.5, 0.0);
+    syncLadderEmpty();
+    updateSummary();
+  });
+
+  [[1.0, -0.5]].forEach(([trigger, sl]) => addLadderRow(trigger, sl));
+  syncLadderEmpty();
 
   // Equity chart hover: crosshair + tooltip with date and cumulative R
   const equityCanvas = $("equityChart");
