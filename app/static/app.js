@@ -125,6 +125,14 @@
     </div>`;
   }
 
+  function evVerdict(ev){
+    if (ev === null || ev === undefined) return "";
+    if (ev >= 0.2) return "Good expectancy — keep trading this edge.";
+    if (ev > 0) return "Positive but thin — raise the RR (wider TP / tighter SL) or improve the win rate.";
+    if (ev === 0) return "Flat — no edge. Costs alone will sink it.";
+    return "Negative expectancy — this setup loses in the long run. Revisit the entry rules or abandon it.";
+  }
+
   function renderStats(stats){
     const totalRClass = stats.total_r > 0 ? "pos" : (stats.total_r < 0 ? "neg" : "neutral");
     const avgRClass = stats.average_r > 0 ? "pos" : (stats.average_r < 0 ? "neg" : "neutral");
@@ -133,10 +141,9 @@
       statCardHtml("Total trades", stats.total_trades, "neutral"),
       statCardHtml("Win rate", fmtPct(stats.win_rate) + (stats.win_rate_no_be !== null ? ` <span class="stat-sub">ex-BE ${fmtPct(stats.win_rate_no_be)}</span>` : ""), "neutral"),
       statCardHtml("Total R", (stats.total_r > 0 ? "+" : "") + fmt(stats.total_r), totalRClass),
-      statCardHtml("Avg R / trade", (stats.average_r > 0 ? "+" : "") + fmt(stats.average_r), avgRClass),
-      statCardHtml("Profit factor", stats.profit_factor !== null ? fmt(stats.profit_factor) : "—",
-        "neutral",
-        stats.expectancy_r !== null ? `<span class="stat-sub">EV ${stats.expectancy_r > 0 ? "+" : ""}${fmt(stats.expectancy_r)}R / trade</span>` : ""),
+      statCardHtml("EV (Avg R / trade)", (stats.average_r > 0 ? "+" : "") + fmt(stats.average_r), avgRClass,
+        `<span class="stat-sub stat-verdict">${evVerdict(stats.expectancy_r)}</span>`),
+      statCardHtml("Profit factor", stats.profit_factor !== null ? fmt(stats.profit_factor) : "—", "neutral"),
       statCardHtml("Max drawdown", fmt(stats.max_drawdown_r) + "R", "neg"),
       statCardHtml("Longest win streak", stats.longest_win_streak, "pos"),
       statCardHtml("Longest loss streak", stats.longest_loss_streak, "neg"),

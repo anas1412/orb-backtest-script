@@ -346,6 +346,7 @@ body{
   color: var(--text-faint);
   margin-top: 4px;
 }
+.stat-verdict{ letter-spacing: 0; line-height: 1.45; }
 
 /* ---------- Chart ---------- */
 .chart-panel{ padding: 18px 22px; position: relative; }
