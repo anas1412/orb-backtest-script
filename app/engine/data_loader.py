@@ -169,16 +169,33 @@ def load_ohlcv_csv(
 
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing and raw.shape[1] >= 5:
-        # MetaTrader-style exports have no header row and a structure like:
-        #   "2026-05-01 20:41, 4611.278, 4611.998, 4610.578, 4611.818, 1"
-        # i.e. the first value of the first row parses as a datetime. Try again
+        # MetaTrader-style exports have no header row. Two layouts:
+        #   merged datetime: "2026-05-01 20:41, 4611.278, ..., 1"       (5-6 cols)
+        #   split date/time: "2025.01.01, 18:00, 2625.098, ..., 0"      (6-8 cols)
+        # The first value of the first row parses as a datetime. Try again
         # with positional column names instead of rejecting the file.
         first_cell = str(raw.iloc[0, 0]).strip()
         if not pd.isna(pd.to_datetime(first_cell, errors="coerce")):
             raw2 = pd.read_csv(io.BytesIO(file_bytes), sep=delimiter, engine="python", header=None)
-            names = ["timestamp", "open", "high", "low", "close"]
-            if raw2.shape[1] >= 6:
-                names.append("volume")
+
+            # Distinguish the layouts by sniffing column 2: a time-of-day
+            # (HH:MM) means date and time are separate columns.
+            time_like = False
+            if raw2.shape[1] >= 2:
+                probe = str(raw2.iloc[0, 1]).strip()
+                time_like = pd.notna(pd.to_datetime(probe, errors="coerce", format="%H:%M"))
+
+            if time_like:
+                # split date/time: [date, time, o, h, l, c, (vol), (real vol)]
+                names = ["date", "time", "open", "high", "low", "close"]
+                if raw2.shape[1] >= 7:
+                    names.append("volume")
+                if raw2.shape[1] >= 8:
+                    names.append("real_volume")  # extra col is tolerated, dropped later
+            else:
+                names = ["timestamp", "open", "high", "low", "close"]
+                if raw2.shape[1] >= 6:
+                    names.append("volume")
             raw2.columns = names
             df = _standardize_columns(raw2)
             missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
