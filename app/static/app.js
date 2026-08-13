@@ -558,9 +558,11 @@
     const rows = keys.map(k => {
       const d = dow[k];
       const rClass = d.total_r > 0 ? "pos" : (d.total_r < 0 ? "neg" : "");
+      const ev = d.trades > 0 ? d.total_r / d.trades : 0;
+      const evCls = ev > 0 ? "pos" : (ev < 0 ? "neg" : "");
       return `<div class="breakdown-row">
         <span class="label">${k}</span>
-        <span class="value ${rClass}">${d.trades} trades · ${(d.total_r>0?'+':'')}${fmt(d.total_r)}R · <span class="dim">${fmtPct(d.win_rate)} wr</span></span>
+        <span class="value ${rClass}">${d.trades} trades · ${(d.total_r>0?'+':'')}${fmt(d.total_r)}R · <span class="avg ${evCls}">${(ev > 0 ? "+" : "")}${fmt(ev)} EV</span> · <span class="dim">${fmtPct(d.win_rate)} wr</span></span>
       </div>`;
     });
     $("dowBreakdown").innerHTML = rows.join("");
@@ -630,7 +632,7 @@
       const avgCls = avgR > 0 ? "pos" : (avgR < 0 ? "neg" : "");
       return `<div class="breakdown-row">
         <span class="label">${name}</span>
-        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)}R avg</span> · <span class="dim">${fmtPct(v.w / v.n)} wr</span></span>
+        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)} EV</span> · <span class="dim">${fmtPct(v.w / v.n)} wr</span></span>
       </div>`;
     });
     $("avgMonthBreakdown").innerHTML = rows.join("");
@@ -668,7 +670,7 @@
       const avgCls = avgR > 0 ? "pos" : (avgR < 0 ? "neg" : "");
       return `<div class="breakdown-row">
         <span class="label">${slot}</span>
-        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)}R avg</span> · <span class="dim">${fmtPct(v.w / v.n)} wr</span></span>
+        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)} EV</span> · <span class="dim">${fmtPct(v.w / v.n)} wr</span></span>
       </div>`;
     });
     list.innerHTML = rows.join("");
