@@ -17,25 +17,6 @@ strategy on Gold, M1 timeframe. All logic operates in UTC internally.
 6. Reports full statistics, an equity curve, breakdowns by direction and
    day-of-week, and a downloadable trade log.
 
-## Project layout
-
-```
-app/
-  engine/
-    data_loader.py   # CSV loading + UTC timezone normalization
-    session.py        # opening-range window computation, trading-day iteration
-    strategy.py        # breakout detection, entry modes, SL/TP calculation
-    backtester.py      # main day-by-day simulation loop
-    stats.py            # summary statistics, trade log export, equity curve
-  main.py                # FastAPI app + API routes
-  templates/index.html    # dashboard UI
-  static/style.css         # dashboard styling
-  static/app.js              # dashboard behavior (calls the API, renders results)
-```
-
-The engine (`app/engine/`) is framework-agnostic — it can be imported and
-used directly in a script or notebook without FastAPI.
-
 ## Try it online (hosted)
 
 No installation needed. Open the hosted app, upload your M1 gold CSV, and run:
