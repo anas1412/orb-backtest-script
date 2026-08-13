@@ -668,8 +668,12 @@
       const avgR = v.r / v.n;
       const rClass = v.r > 0 ? "pos" : (v.r < 0 ? "neg" : "");
       const avgCls = avgR > 0 ? "pos" : (avgR < 0 ? "neg" : "");
+      const [sh, sm] = slot.split(":").map(Number);
+      const endMin = (sh * 60 + sm + 14) % 1440;
+      const slotRange = slot + " - " +
+        String(Math.floor(endMin / 60)).padStart(2, "0") + ":" + String(endMin % 60).padStart(2, "0");
       return `<div class="breakdown-row">
-        <span class="label">${slot}</span>
+        <span class="label">${slotRange}</span>
         <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)} EV</span> · <span class="dim">${fmtPct(v.w / v.n)} wr</span></span>
       </div>`;
     });
