@@ -1,1 +1,6 @@
 run = "python3 run.py"
+modules = ["python-3.12", "nodejs-20", "web"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["glibcLocales"]
