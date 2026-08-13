@@ -69,8 +69,19 @@
       spread_pips: parseFloat($("spreadPips").value),
       slippage_pips: parseFloat($("slippagePips").value),
       session_max_hours: parseFloat($("sessionMaxHours").value),
-      skip_weekends: $("skipWeekends").checked,
+      trading_days: readTradingDays(),
     };
+  }
+
+  function readTradingDays(){
+    if ($("allDays").checked){
+      return [0, 1, 2, 3, 4];
+    }
+    const days = [];
+    document.querySelectorAll(".day-checkbox").forEach(cb => {
+      if (cb.checked) days.push(parseInt(cb.value, 10));
+    });
+    return days;
   }
 
   function readLadder(){
@@ -98,7 +109,7 @@
       `(0.5 = exact midpoint), take profit at <b>${p.tp_rr}R</b>. ` +
       ladderSummary(p.sl_ladder) +
       `Trades are force-closed after <b>${p.session_max_hours}h</b> if neither level is hit. ` +
-      (p.skip_weekends ? "Weekends are skipped." : "Weekends are included.");
+      daysSummary(p.trading_days);
 
     const hint = $("searchWindowHint");
     if (hint){
@@ -121,6 +132,15 @@
       return `${trigger}R → ${slLabel}`;
     });
     return `As price advances, the stop moves: <b>${parts.join(" · ")}</b>. `;
+  }
+
+  const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  function daysSummary(days){
+    if (!days || days.length === 0) return "";
+    if (days.length === 5 && days.every(d => DAY_NAMES[d])) return "All weekdays (Mon-Fri) are traded.";
+    const names = days.map(d => DAY_NAMES[d]).join(", ");
+    return `Trades taken on: <b>${names}</b>.`;
   }
 
   function showDatasetMeta(data){
@@ -915,6 +935,20 @@
   $("btnClear").addEventListener("click", handleClear);
   $("btnDemo").addEventListener("click", handleDemo);
   $("btnExport").addEventListener("click", handleExport);
+
+  function syncAllDaysToggle(){
+    const all = $("allDays").checked;
+    document.querySelectorAll(".day-checkbox").forEach(cb => {
+      cb.disabled = all;
+      cb.checked = all ? true : cb.checked;
+    });
+    $("dayPills").classList.toggle("disabled", all);
+  }
+  $("allDays").addEventListener("change", () => {
+    syncAllDaysToggle();
+    updateSummary();
+  });
+  syncAllDaysToggle();
 
   $("calPrev").addEventListener("click", () => {
     if (!calendarMonth) return;

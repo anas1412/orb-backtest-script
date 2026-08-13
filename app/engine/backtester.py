@@ -161,7 +161,7 @@ def run_backtest(
     stream live progress to the UI. The engine itself never blocks on it.
     """
     result = BacktestResult(params=params)
-    days = get_trading_days(df, skip_weekends=params.skip_weekends)
+    days = get_trading_days(df, trading_days=set(params.trading_days))
     total = len(days)
 
     for i, day in enumerate(days):

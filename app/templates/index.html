@@ -127,10 +127,20 @@
             <span>Max trade duration (hours)</span>
             <input type="number" id="sessionMaxHours" value="20" min="0.5" step="0.5">
           </label>
-          <label class="field checkbox-field">
-            <input type="checkbox" id="skipWeekends" checked>
-            <span>Skip Saturday &amp; Sunday</span>
-          </label>
+          <div class="field">
+            <span>Trade days</span>
+            <label class="checkbox-field">
+              <input type="checkbox" id="allDays" checked>
+              <span>All days (Mon-Fri)</span>
+            </label>
+            <div class="day-pills" id="dayPills">
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="0" checked><span>Mon</span></label>
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="1" checked><span>Tue</span></label>
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="2" checked><span>Wed</span></label>
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="3" checked><span>Thu</span></label>
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="4" checked><span>Fri</span></label>
+            </div>
+          </div>
         </section>
       </div>
 

@@ -36,7 +36,8 @@ class Params:
     spread_pips: float = 0.0
     slippage_pips: float = 0.0
     session_max_hours: float = 20.0
-    skip_weekends: bool = True
+    # ISO weekdays (Mon=0 ... Fri=4) on which trades are taken; Sat/Sun excluded.
+    trading_days: tuple[int, ...] = (0, 1, 2, 3, 4)
     # Stop-management: a ladder of (trigger_R, sl_R_from_entry) steps. R is the
     # ORIGINAL risk distance (entry to initial SL), fixed for the whole trade:
     # a moved stop never re-anchors later steps. When price reaches

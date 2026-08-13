@@ -75,7 +75,7 @@ class BacktestParams(BaseModel):
     spread_pips: float = Field(0.0, ge=0.0)
     slippage_pips: float = Field(0.0, ge=0.0)
     session_max_hours: float = Field(20.0, gt=0.0)
-    skip_weekends: bool = True
+    trading_days: list[int] = [0, 1, 2, 3, 4]
     start_date: Optional[str] = None
     end_date: Optional[str] = None
 
@@ -98,6 +98,11 @@ class BacktestParams(BaseModel):
             if sl >= trigger:
                 raise ValueError("A ladder stop cannot sit at or beyond its own trigger.")
             prev_sl = sl
+        if not self.trading_days:
+            raise ValueError("At least one trading day must be selected.")
+        bad = [d for d in self.trading_days if d < 0 or d > 6]
+        if bad:
+            raise ValueError(f"Invalid trading days (ISO weekday 0-6): {bad}")
         return self
 
 
@@ -246,7 +251,7 @@ async def run_backtest_endpoint(p: BacktestParams):
         spread_pips=p.spread_pips,
         slippage_pips=p.slippage_pips,
         session_max_hours=p.session_max_hours,
-        skip_weekends=p.skip_weekends,
+        trading_days=tuple(p.trading_days),
     )
 
     # Stream the run as NDJSON: one {"type":"progress","done","total"} line per

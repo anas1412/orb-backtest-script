@@ -31,11 +31,18 @@ def parse_hhmm(hhmm: str) -> dt_time:
     return dt_time(hour=int(hh), minute=int(mm))
 
 
-def get_trading_days(df: pd.DataFrame, skip_weekends: bool = True) -> list[pd.Timestamp]:
-    """Return sorted unique UTC calendar dates present in the data, weekends optionally excluded."""
+def get_trading_days(
+    df: pd.DataFrame,
+    trading_days: set[int] | None = None,
+) -> list[pd.Timestamp]:
+    """
+    Return sorted unique UTC calendar dates present in the data, restricted to
+    the given ISO weekdays (Mon=0 ... Sun=6). None keeps all days. Defaults to
+    no filtering (callers pass an explicit set).
+    """
     dates = pd.Series(df["timestamp"].dt.normalize().unique()).sort_values()
-    if skip_weekends:
-        dates = dates[dates.dt.dayofweek < 5]  # Mon=0 ... Fri=4
+    if trading_days is not None:
+        dates = dates[dates.dt.dayofweek.isin(trading_days)]
     return list(dates)
 
 
