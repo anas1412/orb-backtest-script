@@ -10,7 +10,8 @@ strategy on Gold, M1 timeframe. All logic operates in UTC internally.
 1. Marks the high/low of the first N minutes after a configurable session
    open time (UTC), default 00:00 UTC / 15 minutes.
 2. Watches for the first M1 candle to close outside that range within a
-   configurable search window (default 180 minutes).
+   configurable search window after the range closes (default 75 minutes →
+   search until 01:30).
 3. Enters via market order (next bar's open) or limit order (resting at the
    broken boundary, expiring at the search-window deadline).
 4. Places the stop loss at the range midpoint by default (adjustable), and

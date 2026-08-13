@@ -92,7 +92,7 @@
     $("summaryText").innerHTML =
       `Over the full loaded dataset. ` +
       `Mark the <b>${p.range_minutes}-minute</b> opening range starting at <b>${p.session_open_utc} UTC</b>. ` +
-      `If an M1 candle closes outside the range within <b>${p.breakout_search_minutes} minutes</b> of session open, take ` +
+      `If an M1 candle closes outside the range within <b>${p.breakout_search_minutes} minutes</b> after the range closes, take ` +
       `${entryDesc}. ` +
       `Stop loss sits at <b>${p.sl_pct_of_range}× range</b> from the midpoint ` +
       `(0.5 = exact midpoint), take profit at <b>${p.tp_rr}R</b>. ` +

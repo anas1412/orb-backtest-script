@@ -49,7 +49,8 @@ def compute_session_range(
     """
     For a given UTC calendar day, compute the opening-range high/low from
     the first `range_minutes` minutes after `session_open_utc`, and the
-    deadline (in UTC) after which breakout search stops.
+    deadline (in UTC) after which breakout search stops: the range end plus
+    `breakout_search_minutes` of additional searching.
     """
     t = parse_hhmm(session_open_utc)
     session_open = pd.Timestamp(
@@ -57,7 +58,7 @@ def compute_session_range(
         hour=t.hour, minute=t.minute, tz="UTC",
     )
     range_end = session_open + timedelta(minutes=range_minutes)
-    search_deadline = session_open + timedelta(minutes=breakout_search_minutes)
+    search_deadline = range_end + timedelta(minutes=breakout_search_minutes)
 
     mask = (df["timestamp"] >= session_open) & (df["timestamp"] < range_end)
     window = df.loc[mask]

@@ -3,7 +3,7 @@ Strategy logic: breakout detection, entry (market/limit), SL/TP calculation.
 
 All rules here follow plan.md exactly:
 - Breakout = M1 candle CLOSE beyond range_high/range_low, first one wins.
-- Search window: from range_end until search_deadline (session_open + breakout_search_minutes).
+- Search window: from range_end until search_deadline (range_end + breakout_search_minutes).
 - Entry:
     market -> fills at the OPEN of the candle immediately following the breakout candle.
     limit  -> resting order at the broken boundary, fills if price returns to it before
@@ -29,7 +29,7 @@ EntryMode = Literal["market", "limit"]
 class Params:
     session_open_utc: str = "00:00"
     range_minutes: int = 15
-    breakout_search_minutes: int = 180
+    breakout_search_minutes: int = 75
     entry_mode: EntryMode = "market"
     sl_pct_of_range: float = 0.5
     tp_rr: float = 2.0
