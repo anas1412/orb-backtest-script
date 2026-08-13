@@ -392,7 +392,8 @@
 
     const perDay = {};
     trades.forEach((t, i) => {
-      const v = perDay[t.date] || { r: 0, usd: 0 };
+      const v = perDay[t.date] || { n: 0, r: 0, usd: 0 };
+      v.n++;
       v.r += t.r_multiple;
       v.usd += pnl ? (pnl[i] || 0) : 0;
       perDay[t.date] = v;
@@ -415,40 +416,84 @@
     const firstDow = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7;
 
     const useUsd = pnl != null;
-    let mTotal = 0, absMax = 1e-9;
+    const initialCap = readCapitalParams().initial_capital;
+    const calPct = (val) => initialCap > 0
+      ? (val > 0 ? "+" : "") + (val / initialCap * 100).toFixed(2) + "%"
+      : "";
+    let mTotal = 0, mR = 0, mN = 0, absMax = 1e-9;
     Object.entries(perDay).forEach(([d, v]) => {
       if (!d.startsWith(monthKey)) return;
       const val = useUsd ? v.usd : v.r;
       mTotal += val;
+      mR += v.r;
+      mN += v.n;
       absMax = Math.max(absMax, Math.abs(val));
     });
 
     label.textContent = new Date(Date.UTC(y, m, 1))
       .toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
-    const totalCls = mTotal > 0 ? "pos" : (mTotal < 0 ? "neg" : "");
-    totalEl.textContent = "Month: " + (useUsd ? fmtUsdSigned(mTotal) : (mTotal > 0 ? "+" : "") + fmt(mTotal, 1) + "R");
+    const totalCls = mR > 0 ? "pos" : (mR < 0 ? "neg" : "");
+    totalEl.textContent = `${mN} trade${mN === 1 ? "" : "s"} · ${(mR > 0 ? "+" : "")}${fmt(mR)}R` +
+      (useUsd ? ` · ${fmtUsdSigned(mTotal)}` : "");
     totalEl.className = "cal-total " + totalCls;
     next.disabled = (y === lastY && m + 1 === lastM);
 
-    const dowNames = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+    const dowNames = ["Mo", "Tu", "We", "Th", "Fr", "Week total"];
     let cells = dowNames.map(d => `<div class="cal-dow">${d}</div>`).join("");
-    for (let i = 0; i < firstDow; i++) cells += `<div class="cal-day empty"></div>`;
-    for (let d = 1; d <= daysInMonth; d++){
-      const key = `${monthKey}-${String(d).padStart(2, "0")}`;
-      const v = perDay[key];
-      let cls = "cal-day";
-      let inner = `<span class="cal-num">${d}</span>`;
-      if (v && (useUsd ? v.usd : v.r) !== 0){
-        const val = useUsd ? v.usd : v.r;
-        const alpha = 0.08 + 0.30 * (Math.abs(val) / absMax);
+    let weekR = 0, weekUsd = 0, slotsInWeek = 0;
+    const flushWeek = () => {
+      while (slotsInWeek < 5){
+        cells += `<div class="cal-day empty"></div>`;
+        slotsInWeek++;
+      }
+      const has = (useUsd ? weekUsd : weekR) !== 0;
+      const val = useUsd ? weekUsd : weekR;
+      let cls = "cal-day week-total";
+      let inner = `<span class="cal-num">Σ</span>`;
+      if (has){
+        const alpha = Math.min(1, 0.08 + 0.30 * (Math.abs(val) / absMax));
         const color = val > 0 ? `rgba(107,197,147,${alpha})` : `rgba(217,114,103,${alpha})`;
         cls += " has-value";
         inner += `<span class="cal-val" style="background:${color}">${calCellValue(val, useUsd)}</span>`;
+        if (useUsd){
+          inner += `<span class="cal-val cal-extra">${(weekR > 0 ? "+" : "")}${fmt(weekR, 1)}R · ${calPct(weekUsd)}</span>`;
+        }
+      } else {
+        inner += `<span class="cal-val cal-flat">—</span>`;
       }
       cells += `<div class="${cls}">${inner}</div>`;
+      weekR = 0;
+      weekUsd = 0;
+      slotsInWeek = 0;
+    };
+    for (let d = 1; d <= daysInMonth; d++){
+      const dowIdx = (firstDow + d - 1) % 7;
+      if (dowIdx < 5){
+        while (slotsInWeek < dowIdx){
+          cells += `<div class="cal-day empty"></div>`;
+          slotsInWeek++;
+        }
+        const key = `${monthKey}-${String(d).padStart(2, "0")}`;
+        const v = perDay[key];
+        let cls = "cal-day";
+        let inner = `<span class="cal-num">${d}</span>`;
+        if (v && (useUsd ? v.usd : v.r) !== 0){
+          const val = useUsd ? v.usd : v.r;
+          const alpha = Math.min(1, 0.08 + 0.30 * (Math.abs(val) / absMax));
+          const color = val > 0 ? `rgba(107,197,147,${alpha})` : `rgba(217,114,103,${alpha})`;
+          cls += " has-value";
+          inner += `<span class="cal-val" style="background:${color}">${calCellValue(val, useUsd)}</span>`;
+        }
+        cells += `<div class="${cls}">${inner}</div>`;
+        slotsInWeek++;
+        if (v){
+          weekR += v.r;
+          weekUsd += v.usd;
+        }
+      }
+      if (dowIdx === 6) flushWeek();
     }
-    let pad = (firstDow + daysInMonth) % 7;
-    if (pad) for (let i = 0; i < 7 - pad; i++) cells += `<div class="cal-day empty"></div>`;
+    flushWeek();
     grid.innerHTML = cells;
   }
 

@@ -517,7 +517,7 @@ body{
 .cal-total.neg{ color: var(--neg-bright); }
 .cal-grid{
   display:grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 4px;
 }
 .cal-dow{
@@ -537,6 +537,26 @@ body{
   align-items:flex-start;
 }
 .cal-day.empty{ background: transparent; border-color: transparent; }
+.cal-day.week-total{
+  background: var(--panel);
+  border-color: var(--border);
+}
+.cal-day.week-total .cal-num{
+  color: var(--gold);
+  font-weight: 700;
+}
+.cal-val.cal-flat{
+  background: transparent;
+  color: var(--text-faint);
+  font-weight: 400;
+}
+.cal-val.cal-extra{
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 9px;
+  padding: 0 1px;
+}
 .cal-num{ font-size: 10.5px; color: var(--text-faint); line-height: 1; }
 .cal-val{
   font-family: var(--font-mono);
