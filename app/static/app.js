@@ -332,7 +332,7 @@
     renderStats(lastResult.stats, sim);
     renderCalendar(lastResult.trades, sim ? sim.pnl : null);
     renderDowBreakdown(lastResult.breakdown_day_of_week);
-    renderMonthBreakdown(lastResult.trades, sim ? sim.pnl : null);
+    renderMonthBreakdown(lastResult.trades);
     renderAvgMonthBreakdown(lastResult.trades);
     renderSlotBreakdown(lastResult.trades);
     renderTable(lastResult.trades, sim ? sim.pnl : null);
@@ -568,7 +568,7 @@
     $("dowBreakdown").innerHTML = rows.join("");
   }
 
-  function renderMonthBreakdown(trades, pnl){
+  function renderMonthBreakdown(trades){
     const list = $("monthBreakdown");
     const label = $("yearLabel");
     const next = $("yearNext");
@@ -579,12 +579,12 @@
       return;
     }
     const byMonth = {};
-    trades.forEach((t, i) => {
+    trades.forEach(t => {
       const key = t.date.slice(0, 7);
-      const v = byMonth[key] || { n: 0, r: 0, usd: 0 };
+      const v = byMonth[key] || { n: 0, r: 0, w: 0 };
       v.n++;
       v.r += t.r_multiple;
-      v.usd += pnl ? (pnl[i] || 0) : 0;
+      v.w += t.r_multiple > 0 ? 1 : 0;
       byMonth[key] = v;
     });
     const lastYear = +trades[trades.length - 1].date.slice(0, 4);
@@ -593,12 +593,13 @@
     const rows = yearKeys.map(k => {
       const v = byMonth[k];
       const rClass = v.r > 0 ? "pos" : (v.r < 0 ? "neg" : "");
+      const ev = v.r / v.n;
+      const evCls = ev > 0 ? "pos" : (ev < 0 ? "neg" : "");
       const labelText = new Date(k + "-01T00:00:00Z")
         .toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
-      const usd = pnl ? ` · ${fmtUsdSigned(v.usd)}` : "";
       return `<div class="breakdown-row">
         <span class="label">${labelText}</span>
-        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R${usd}</span>
+        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${evCls}">${(ev > 0 ? "+" : "")}${fmt(ev)} EV</span> · <span class="dim">${fmtPct(v.w / v.n)} wr</span></span>
       </div>`;
     });
     list.innerHTML = rows.length
