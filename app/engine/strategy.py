@@ -29,7 +29,7 @@ EntryMode = Literal["market", "limit"]
 class Params:
     session_open_utc: str = "00:00"
     range_minutes: int = 15
-    breakout_search_minutes: int = 75
+    breakout_search_minutes: int = 44
     entry_mode: EntryMode = "market"
     sl_pct_of_range: float = 0.5
     tp_rr: float = 2.0

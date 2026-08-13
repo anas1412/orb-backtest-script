@@ -67,7 +67,7 @@ class BacktestParams(BaseModel):
     dataset_id: str
     session_open_utc: str = "00:00"
     range_minutes: int = Field(15, ge=1, le=240)
-    breakout_search_minutes: int = Field(75, ge=1, le=480)
+    breakout_search_minutes: int = Field(44, ge=1, le=480)
     entry_mode: str = "market"
     sl_pct_of_range: float = Field(0.5, ge=0.0, le=5.0)
     tp_rr: float = Field(2.0, gt=0.0)
