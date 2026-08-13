@@ -151,3 +151,85 @@ def equity_curve(result: BacktestResult) -> list[dict]:
     if curve:
         curve.insert(0, {"date": curve[0]["date"], "cumulative_r": 0.0})
     return curve
+
+
+@dataclass
+class CapitalSim:
+    final_equity: float
+    total_pnl: float
+    total_return_pct: float
+    max_drawdown_usd: float
+    max_drawdown_pct: float
+    profit_factor_usd: float | None
+    expectancy_usd: float
+    avg_pnl: float
+    # Per-trade dollar P&L, aligned with the ORIGINAL trade order (the order
+    # they appear in BacktestResult.trades), not the internal sort order.
+    pnl: list[float]
+    curve: list[dict]  # [{"date", "equity"}] including the initial baseline
+
+
+def simulate_capital(
+    trades,
+    initial_capital: float,
+    risk_pct: float,
+    compounding: bool,
+) -> CapitalSim:
+    """
+    Simulate a bankroll over the closed trades.
+
+    Each trade risks `risk_pct` of a capital base. "Fixed" sizes every trade
+    off the INITIAL capital (constant dollar risk), so the account is
+    linear in R: equity = initial + initial*risk_pct*sum(R). "Compounding"
+    sizes each trade off the CURRENT equity, so the account grows and
+    shrinks multiplicatively: equity_n = equity_{n-1} * (1 + R_n*risk_pct).
+
+    Trades are simulated in exit-time order (defensive; the engine already
+    produces them chronologically), but the returned `pnl` list preserves the
+    input order so callers can align it 1:1 with the trade list.
+    """
+    ordered = sorted(enumerate(trades), key=lambda it: it[1].exit_time)
+
+    risk_fraction = risk_pct / 100.0
+    equity = float(initial_capital)
+    peak = equity
+    max_dd_usd = 0.0
+    max_dd_pct = 0.0
+    gross_win = gross_loss = 0.0
+    pnl_by_index: dict[int, float] = {}
+    curve = []
+
+    for idx, t in ordered:
+        risk_amount = equity * risk_fraction if compounding else initial_capital * risk_fraction
+        pnl = t.r_multiple * risk_amount
+        pnl_by_index[idx] = round(pnl, 2)
+        equity += pnl
+        if pnl > 0:
+            gross_win += pnl
+        elif pnl < 0:
+            gross_loss += -pnl
+        peak = max(peak, equity)
+        dd_usd = peak - equity
+        if dd_usd > max_dd_usd:
+            max_dd_usd = dd_usd
+            max_dd_pct = (dd_usd / peak * 100.0) if peak > 0 else 0.0
+        curve.append({"date": t.day.date().isoformat(), "equity": round(equity, 2)})
+
+    if curve:
+        curve.insert(0, {"date": curve[0]["date"], "equity": round(initial_capital, 2)})
+
+    pnl = [pnl_by_index.get(i, 0.0) for i in range(len(trades))]
+    total_pnl = round(equity - initial_capital, 2)
+    n = len(pnl)
+    return CapitalSim(
+        final_equity=round(equity, 2),
+        total_pnl=total_pnl,
+        total_return_pct=round(total_pnl / initial_capital * 100.0, 2) if initial_capital > 0 else 0.0,
+        max_drawdown_usd=round(max_dd_usd, 2),
+        max_drawdown_pct=round(max_dd_pct, 2),
+        profit_factor_usd=(round(gross_win / gross_loss, 4) if gross_loss > 0 else None),
+        expectancy_usd=round(sum(pnl) / n, 2) if n > 0 else 0.0,
+        avg_pnl=round(sum(pnl) / n, 2) if n > 0 else 0.0,
+        pnl=pnl,
+        curve=curve,
+    )

@@ -8,7 +8,7 @@ import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import pandas as pd
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
@@ -23,7 +23,9 @@ from app.engine.data_loader import (
 )
 from app.engine.strategy import Params
 from app.engine.backtester import run_backtest, BacktestResult
-from app.engine.stats import compute_stats, trades_to_dataframe, equity_curve
+from app.engine.stats import (
+    compute_stats, trades_to_dataframe, equity_curve, simulate_capital
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -332,12 +334,49 @@ def _serialize_result(result: BacktestResult, job_id: str, loaded: LoadedData, p
     }
 
 
+class CapitalSimParams(BaseModel):
+    initial_capital: float = Field(10000.0, gt=0.0)
+    risk_pct: float = Field(1.0, gt=0.0, le=50.0)
+    mode: Literal["fixed", "compounding"] = "compounding"
+
+
+@app.post("/api/backtest/simulate/{job_id}")
+async def simulate_capital_endpoint(job_id: str, p: CapitalSimParams):
+    result = RESULT_STORE.get(job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Backtest result not found.")
+    sim = simulate_capital(result.trades, p.initial_capital, p.risk_pct, p.mode == "compounding")
+    return {
+        "stats": {
+            "final_equity": sim.final_equity,
+            "total_pnl": sim.total_pnl,
+            "total_return_pct": sim.total_return_pct,
+            "max_drawdown_usd": sim.max_drawdown_usd,
+            "max_drawdown_pct": sim.max_drawdown_pct,
+            "profit_factor_usd": sim.profit_factor_usd,
+            "expectancy_usd": sim.expectancy_usd,
+            "avg_pnl": sim.avg_pnl,
+        },
+        "curve": sim.curve,
+        "pnl": sim.pnl,
+    }
+
+
 @app.get("/api/backtest/export/{job_id}")
-async def export_trades_csv(job_id: str):
+async def export_trades_csv(
+    job_id: str,
+    capital: int = 0,
+    initial_capital: float = 10000.0,
+    risk_pct: float = 1.0,
+    mode: Literal["fixed", "compounding"] = "compounding",
+):
     result = RESULT_STORE.get(job_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Result not found")
     df = trades_to_dataframe(result)
+    if capital:
+        sim = simulate_capital(result.trades, initial_capital, risk_pct, mode == "compounding")
+        df.insert(len(df.columns), "pnl_usd", sim.pnl)
     buf = io.StringIO()
     df.to_csv(buf, index=False)
     buf.seek(0)

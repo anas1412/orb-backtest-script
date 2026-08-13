@@ -38,6 +38,7 @@
         <button class="tab active" data-tab="data" role="tab" aria-selected="true"><i data-lucide="database"></i>Data</button>
         <button class="tab" data-tab="strategy" role="tab" aria-selected="false"><i data-lucide="chart-candlestick"></i>Strategy</button>
         <button class="tab" data-tab="risk" role="tab" aria-selected="false"><i data-lucide="shield"></i>Risk</button>
+        <button class="tab" data-tab="capital" role="tab" aria-selected="false"><i data-lucide="coins"></i>Capital</button>
       </nav>
 
       <div class="tab-page active" data-page="data">
@@ -163,6 +164,35 @@
               <span>Slippage (pips)</span>
               <input type="number" id="slippagePips" value="0" min="0" step="0.1">
             </label>
+          </div>
+        </section>
+      </div>
+
+      <div class="tab-page" data-page="capital">
+        <section class="group">
+          <h3 class="group-title">Capital simulation</h3>
+          <label class="field checkbox-field">
+            <input type="checkbox" id="capitalEnabled">
+            <span>Enable capital simulation</span>
+          </label>
+          <p class="hint">Sizes every trade's dollar risk from your bankroll. Pure post-process over the backtest — no re-run needed, tweak any value and the results update instantly.</p>
+          <div id="capitalControls" class="disabled">
+          <label class="field">
+            <span>Initial capital ($)</span>
+            <input type="number" id="capitalInitial" value="10000" min="1" step="100">
+          </label>
+          <label class="field">
+            <span>Risk per trade (%)</span>
+            <input type="number" id="capitalRiskPct" value="1" min="0.01" max="50" step="0.1">
+          </label>
+          <label class="field">
+            <span>Risk basis</span>
+            <select id="capitalMode">
+              <option value="compounding" selected>Compounding — % of current equity</option>
+              <option value="fixed">Fixed — % of initial capital</option>
+            </select>
+          </label>
+          <p class="hint">Fixed risks the same dollar amount every trade. Compounding sizes each trade off the current account: wins grow the risk, losses shrink it.</p>
           </div>
         </section>
       </div>

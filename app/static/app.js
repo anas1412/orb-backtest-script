@@ -3,6 +3,8 @@
 
   let currentDatasetId = null;
   let currentJobId = null;
+  let lastResult = null;
+  let lastSim = null;
 
   const $ = (id) => document.getElementById(id);
 
@@ -26,6 +28,31 @@
     const s = ms / 1000;
     if (s < 60) return s.toFixed(1) + "s";
     return Math.floor(s / 60) + "m " + Math.round(s % 60) + "s";
+  }
+
+  function fmtUsd(n){
+    if (n === null || n === undefined) return "—";
+    const s = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (n < 0 ? "-" : "") + "$" + s;
+  }
+
+  function fmtUsdSigned(n){
+    if (n === null || n === undefined) return "—";
+    return (n > 0 ? "+" : "") + fmtUsd(n);
+  }
+
+  function fmtAxis(v){
+    if (Math.abs(v) >= 1000) return (v / 1000).toFixed(1) + "k";
+    return v.toFixed(1);
+  }
+
+  function readCapitalParams(){
+    return {
+      enabled: $("capitalEnabled").checked,
+      initial_capital: parseFloat($("capitalInitial").value) || 0,
+      risk_pct: parseFloat($("capitalRiskPct").value) || 0,
+      mode: $("capitalMode").value,
+    };
   }
 
   function readParams(){
@@ -197,6 +224,8 @@
     }
     currentDatasetId = null;
     currentJobId = null;
+    lastResult = null;
+    lastSim = null;
     $("btnGenerate").disabled = true;
     $("btnClear").disabled = true;
     $("datasetMeta").innerHTML = "No dataset loaded";
@@ -224,59 +253,126 @@
     return "Negative expectancy — this setup loses in the long run. Revisit the entry rules or abandon it.";
   }
 
-  function renderStats(stats){
+  async function refreshSim(){
+    const cap = readCapitalParams();
+    if (!cap.enabled || !currentJobId){
+      lastSim = null;
+      renderAll();
+      return;
+    }
+    try{
+      const res = await fetch(`/api/backtest/simulate/${currentJobId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          initial_capital: cap.initial_capital,
+          risk_pct: cap.risk_pct,
+          mode: cap.mode,
+        }),
+      });
+      if (!res.ok){
+        lastSim = null;
+        renderAll();
+        return;
+      }
+      lastSim = await res.json();
+    } catch(e){
+      lastSim = null;
+    }
+    renderAll();
+  }
+
+  function dollarTotals(trades, pnl){
+    const out = { long: 0, short: 0, dow: {} };
+    (trades || []).forEach((t, i) => {
+      const p = pnl ? (pnl[i] || 0) : 0;
+      out[t.direction] += p;
+      const dow = new Date(t.date + "T00:00:00Z").toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+      out.dow[dow] = (out.dow[dow] || 0) + p;
+    });
+    return out;
+  }
+
+  function renderAll(){
+    if (!lastResult) return;
+    const sim = lastSim;
+    const trades = sim ? lastResult.trades : null;
+    renderStats(lastResult.stats, sim);
+    renderDirectionBreakdown(lastResult.breakdown_direction, trades, sim ? sim.pnl : null);
+    renderDowBreakdown(lastResult.breakdown_day_of_week, trades, sim ? sim.pnl : null);
+    renderTable(lastResult.trades, sim ? sim.pnl : null);
+    renderEquityCurve(lastResult.equity_curve, sim ? sim.curve : null, sim ? readCapitalParams().initial_capital : null);
+    const sub = document.querySelector(".chart-panel .panel-sub");
+    if (sub) sub.textContent = sim ? "Equity ($)" : "Cumulative R";
+  }
+
+  function renderStats(stats, sim){
     const totalRClass = stats.total_r > 0 ? "pos" : (stats.total_r < 0 ? "neg" : "neutral");
     const avgRClass = stats.average_r > 0 ? "pos" : (stats.average_r < 0 ? "neg" : "neutral");
 
-    const cards = [
+    const cards = [];
+    if (sim){
+      cards.push(statCardHtml("Final equity", fmtUsd(sim.stats.final_equity),
+        sim.stats.total_pnl > 0 ? "pos" : (sim.stats.total_pnl < 0 ? "neg" : "neutral"),
+        `<span class="stat-sub">${(stats.total_r > 0 ? "+" : "")}${fmt(stats.total_r)}R · ${fmtUsdSigned(sim.stats.total_pnl)} · ${sim.stats.total_return_pct > 0 ? "+" : ""}${sim.stats.total_return_pct}%</span>`));
+    } else {
+      cards.push(statCardHtml("Total R", (stats.total_r > 0 ? "+" : "") + fmt(stats.total_r), totalRClass));
+    }
+    cards.push(
       statCardHtml("Total trades", stats.total_trades, "neutral"),
       statCardHtml("Win rate", fmtPct(stats.win_rate) + (stats.win_rate_no_be !== null ? ` <span class="stat-sub">ex-BE ${fmtPct(stats.win_rate_no_be)}</span>` : ""), "neutral"),
-      statCardHtml("Total R", (stats.total_r > 0 ? "+" : "") + fmt(stats.total_r), totalRClass),
       statCardHtml("EV (Avg R / trade)", (stats.average_r > 0 ? "+" : "") + fmt(stats.average_r), avgRClass,
-        `<span class="stat-sub stat-verdict">${evVerdict(stats.expectancy_r)}</span>`),
-      statCardHtml("Profit factor", stats.profit_factor !== null ? fmt(stats.profit_factor) : "—", "neutral"),
-      statCardHtml("Max drawdown", fmt(stats.max_drawdown_r) + "R", "neg"),
+        `<span class="stat-sub stat-verdict">${sim ? fmtUsdSigned(sim.stats.avg_pnl) + " · " : ""}${evVerdict(stats.expectancy_r)}</span>`),
+      statCardHtml("Profit factor", stats.profit_factor !== null ? fmt(stats.profit_factor) : "—", "neutral",
+        sim && sim.stats.profit_factor_usd !== null ? `<span class="stat-sub">${fmt(sim.stats.profit_factor_usd)} in $</span>` : ""),
+      statCardHtml("Max drawdown", fmt(stats.max_drawdown_r) + "R", "neg",
+        sim ? `<span class="stat-sub">${fmtUsd(sim.stats.max_drawdown_usd)} · ${sim.stats.max_drawdown_pct}%</span>` : ""),
       statCardHtml("Longest win streak", stats.longest_win_streak, "pos"),
-      statCardHtml("Longest loss streak", stats.longest_loss_streak, "neg"),
-    ];
+      statCardHtml("Longest loss streak", stats.longest_loss_streak, "neg"));
     $("statGrid").innerHTML = cards.join("");
   }
 
-  function renderDirectionBreakdown(bd){
+  function renderDirectionBreakdown(bd, trades, pnl){
+    const dt = trades ? dollarTotals(trades, pnl) : null;
     const rows = ["long", "short"].map(dir => {
       const d = bd[dir];
       const wr = d.win_rate !== null ? fmtPct(d.win_rate) : "—";
+      const usd = dt ? ` · ${fmtUsdSigned(dt[dir])}` : "";
       return `<div class="breakdown-row">
         <span class="label">${dir}</span>
-        <span class="value">${d.trades} trades · ${wr} win rate</span>
+        <span class="value">${d.trades} trades · ${wr} win rate${usd}</span>
       </div>`;
     });
     $("directionBreakdown").innerHTML = rows.join("");
   }
 
-  function renderDowBreakdown(dow){
+  function renderDowBreakdown(dow, trades, pnl){
     const order = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
     const keys = Object.keys(dow).sort((a,b) => order.indexOf(a) - order.indexOf(b));
     if (keys.length === 0){
       $("dowBreakdown").innerHTML = `<div class="breakdown-row"><span class="label">No trades</span></div>`;
       return;
     }
+    const dt = trades ? dollarTotals(trades, pnl) : null;
     const rows = keys.map(k => {
       const d = dow[k];
       const rClass = d.total_r > 0 ? "pos" : (d.total_r < 0 ? "neg" : "");
+      const usd = dt && dt.dow[k] ? ` · ${fmtUsdSigned(dt.dow[k])}` : "";
       return `<div class="breakdown-row">
         <span class="label">${k}</span>
-        <span class="value ${rClass}">${d.trades} trades · ${(d.total_r>0?'+':'')}${fmt(d.total_r)}R</span>
+        <span class="value ${rClass}">${d.trades} trades · ${(d.total_r>0?'+':'')}${fmt(d.total_r)}R${usd}</span>
       </div>`;
     });
     $("dowBreakdown").innerHTML = rows.join("");
   }
 
-  function renderTable(trades){
+  function renderTable(trades, pnl){
     const tbody = document.querySelector("#tradeTable tbody");
-    tbody.innerHTML = trades.map(t => {
+    tbody.innerHTML = trades.map((t, i) => {
       const rClass = t.r_multiple > 0 ? "r-pos" : (t.r_multiple < 0 ? "r-neg" : "");
       const dirClass = t.direction === "long" ? "dir-long" : "dir-short";
+      const p = pnl ? pnl[i] : null;
+      const pClass = p > 0 ? "r-pos" : (p < 0 ? "r-neg" : "");
       return `<tr>
         <td>${t.date}</td>
         <td class="${dirClass}">${t.direction}</td>
@@ -286,13 +382,14 @@
         <td>${fmt(t.exit_price)}</td>
         <td><span class="reason-tag">${t.exit_reason}</span></td>
         <td class="${rClass}">${t.r_multiple > 0 ? '+' : ''}${fmt(t.r_multiple)}</td>
+        ${pnl ? `<td class="${pClass}">${fmtUsdSigned(p)}</td>` : ""}
       </tr>`;
     }).join("");
   }
 
   let equityState = null;
 
-  function renderEquityCurve(curve){
+  function renderEquityCurve(curveR, curve$, initialCap){
     const canvas = $("equityChart");
     const ctx = canvas.getContext("2d");
     const dpr = window.devicePixelRatio || 1;
@@ -306,6 +403,7 @@
 
     equityState = null;
     ctx.clearRect(0,0,w,h);
+    const curve = curve$ || curveR;
     if (curve.length === 0){
       ctx.fillStyle = "#565f70";
       ctx.font = "12px 'JetBrains Mono'";
@@ -316,18 +414,23 @@
     const pad = { l: 44, r: 16, t: 16, b: 24 };
     const plotW = w - pad.l - pad.r;
     const plotH = h - pad.t - pad.b;
-    const values = curve.map(p => p.cumulative_r);
-    const minV = Math.min(0, ...values);
-    const maxV = Math.max(0, ...values);
+
+    const valOf = p => p.cumulative_r !== undefined ? p.cumulative_r : p.equity;
+    const values = curve.map(valOf);
+    const zeroVal = curve$ ? initialCap : 0;
+    const minV = Math.min(zeroVal, ...values);
+    const maxV = Math.max(zeroVal, ...values);
+    const toY = (v) => maxV === minV ? pad.t + plotH/2
+                                     : pad.t + plotH - ((v - minV) / (maxV - minV)) * plotH;
     const pts = curve.map((p, i) => ({
       x: pad.l + (i / Math.max(1, curve.length - 1)) * plotW,
-      y: maxV === minV ? pad.t + plotH/2
-                       : pad.t + plotH - ((p.cumulative_r - minV) / (maxV - minV)) * plotH,
+      y: toY(valOf(p)),
       date: p.date,
-      r: p.cumulative_r,
+      v: valOf(p),
     }));
 
-    equityState = { ctx, w, h, pad, pts, minV, maxV };
+    // No R overlay when the dollar equity curve is primary: one curve only.
+    equityState = { ctx, w, h, pad, pts, minV, maxV, zeroVal, pts2: null, usd: !!curve$, initCap: curve$ ? initialCap : null };
     drawEquityChart();
   }
 
@@ -339,7 +442,7 @@
     const plotH = h - pad.t - pad.b;
     ctx.clearRect(0,0,w,h);
 
-    const zeroY = pad.t + plotH - ((0 - s.minV) / (s.maxV - s.minV)) * plotH;
+    const zeroY = pad.t + plotH - ((s.zeroVal - s.minV) / (s.maxV - s.minV)) * plotH;
     ctx.strokeStyle = "#232937";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -349,10 +452,10 @@
 
     ctx.fillStyle = "#565f70";
     ctx.font = "10px 'JetBrains Mono'";
-    ctx.fillText(s.maxV.toFixed(1), 4, pad.t + 8);
-    ctx.fillText(s.minV.toFixed(1), 4, h - pad.b);
+    ctx.fillText(fmtAxis(s.maxV), 4, pad.t + 8);
+    ctx.fillText(fmtAxis(s.minV), 4, h - pad.b);
 
-    const finalPositive = pts[pts.length - 1].r >= 0;
+    const finalPositive = pts[pts.length - 1].v >= s.zeroVal;
     ctx.strokeStyle = finalPositive ? "#6bc593" : "#d97267";
     ctx.lineWidth = 1.75;
     ctx.beginPath();
@@ -441,15 +544,12 @@
       if (!data) throw new Error("Backtest produced no result");
 
       currentJobId = data.job_id;
+      lastResult = data;
 
       $("emptyState").style.display = "none";
       $("resultsSection").style.display = "flex";
 
-      renderStats(data.stats);
-      renderDirectionBreakdown(data.breakdown_direction);
-      renderDowBreakdown(data.breakdown_day_of_week);
-      renderTable(data.trades);
-      renderEquityCurve(data.equity_curve);
+      await refreshSim();
     } catch(e){
       alert("Error: " + e.message);
     } finally {
@@ -464,7 +564,12 @@
 
   function handleExport(){
     if (!currentJobId){ return; }
-    window.location.href = `/api/backtest/export/${currentJobId}`;
+    const cap = readCapitalParams();
+    if (cap.enabled){
+      window.location.href = `/api/backtest/export/${currentJobId}?capital=1&initial_capital=${cap.initial_capital}&risk_pct=${cap.risk_pct}&mode=${cap.mode}`;
+    } else {
+      window.location.href = `/api/backtest/export/${currentJobId}`;
+    }
   }
 
   // Tab switching in the params sidebar
@@ -522,6 +627,20 @@
   [[1.0, -0.5]].forEach(([trigger, sl]) => addLadderRow(trigger, sl));
   syncLadderEmpty();
 
+  // Capital simulation: recompute (and re-render) on any change, debounced.
+  let simTimer = null;
+  const scheduleSim = () => {
+    clearTimeout(simTimer);
+    simTimer = setTimeout(refreshSim, 400);
+  };
+  $("capitalEnabled").addEventListener("change", () => {
+    scheduleSim();
+    $("capitalControls").classList.toggle("disabled", !$("capitalEnabled").checked);
+  });
+  $("capitalInitial").addEventListener("input", scheduleSim);
+  $("capitalRiskPct").addEventListener("input", scheduleSim);
+  $("capitalMode").addEventListener("change", scheduleSim);
+
   // Equity chart hover: crosshair + tooltip with date and cumulative R
   const equityCanvas = $("equityChart");
   const tooltip = document.createElement("div");
@@ -532,10 +651,23 @@
     if (!equityState) return;
     const rect = equityCanvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
-    const { ctx, w, h, pad, pts } = equityState;
+    const s = equityState;
+    const { ctx, w, h, pad, pts } = s;
+
+    // 1:1 crosshair: clamp the mouse x into the plot area, then ride the
+    // line segment crossing that x (piecewise-linear interpolation).
+    const plotW = w - pad.l - pad.r;
+    const cx = Math.min(w - pad.r, Math.max(pad.l, mx));
+    const t = pts.length > 1 ? Math.min(pts.length - 1, Math.max(0, (cx - pad.l) / plotW * (pts.length - 1))) : 0;
+    const i0 = Math.max(0, Math.floor(t));
+    const i1 = Math.min(pts.length - 1, i0 + 1);
+    const f = t - i0;
+    const iy = pts[i1].y + (pts[i0].y - pts[i1].y) * (1 - f);
+
+    // nearest point for the tooltip data
     let idx = 0, best = Infinity;
     pts.forEach((p, i) => {
-      const d = Math.abs(p.x - mx);
+      const d = Math.abs(p.x - cx);
       if (d < best){ best = d; idx = i; }
     });
     const p = pts[idx];
@@ -546,21 +678,33 @@
     ctx.lineWidth = 1;
     ctx.setLineDash([3,3]);
     ctx.beginPath();
-    ctx.moveTo(p.x, pad.t);
-    ctx.lineTo(p.x, h - pad.b);
+    ctx.moveTo(cx, pad.t);
+    ctx.lineTo(cx, h - pad.b);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle = "#c9a13b";
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+    ctx.arc(cx, iy, 3.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    const rClass = p.r > 0 ? "pos" : (p.r < 0 ? "neg" : "");
-    tooltip.innerHTML = `<div class="tt-date">${p.date}</div><div class="tt-r ${rClass}">${p.r > 0 ? "+" : ""}${p.r.toFixed(2)} R</div>`;
+    if (s.usd){
+      const pnl = p.v - s.initCap;
+      const pct = s.initCap ? (pnl / s.initCap) * 100 : 0;
+      const pnlClass = pnl > 0 ? "pos" : (pnl < 0 ? "neg" : "");
+      const pctClass = pct > 0 ? "pos" : (pct < 0 ? "neg" : "");
+      tooltip.innerHTML = `<div class="tt-date">${p.date}</div>` +
+        `<div class="tt-r">${fmtUsd(p.v)}</div>` +
+        `<div class="tt-r ${pnlClass}">${fmtUsdSigned(pnl)}</div>` +
+        `<div class="tt-r ${pctClass}">${pct > 0 ? "+" : ""}${pct.toFixed(2)}%</div>`;
+    } else {
+      const rClass = p.v > 0 ? "pos" : (p.v < 0 ? "neg" : "");
+      tooltip.innerHTML = `<div class="tt-date">${p.date}</div>` +
+        `<div class="tt-r ${rClass}">${p.v > 0 ? "+" : ""}${p.v.toFixed(2)} R</div>`;
+    }
     tooltip.style.display = "block";
-    tooltip.style.left = (p.x > w - 150 ? p.x - 158 : p.x + 14) + "px";
-    tooltip.style.top = Math.max(4, p.y - 28) + "px";
+    tooltip.style.left = (cx > w - 150 ? cx - 158 : cx + 14) + "px";
+    tooltip.style.top = Math.max(4, iy - 28) + "px";
   });
 
   equityCanvas.addEventListener("mouseleave", () => {

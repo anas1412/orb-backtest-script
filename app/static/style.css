@@ -221,6 +221,8 @@ body{
 .checkbox-field{ flex-direction:row; align-items:center; gap:8px; }
 .checkbox-field input{ width:auto; padding:0; }
 
+#capitalControls.disabled{ opacity: 0.5; pointer-events: none; transition: opacity 0.15s; }
+
 .hint{
   font-size: 11px; color: var(--text-faint); line-height:1.5;
   margin: -2px 0 12px 0;

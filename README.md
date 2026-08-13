@@ -70,7 +70,23 @@ source's raw timestamp timezone before uploading.
 - `POST /api/data/upload` — upload one or more M1 CSVs (`files` multipart field, repeated for multiple files)
 - `GET /api/data/status/{dataset_id}` — check a loaded dataset
 - `POST /api/backtest/run` — run a backtest with a given parameter set
-- `GET /api/backtest/export/{job_id}` — download the trade log as CSV
+- `POST /api/backtest/simulate/{job_id}` — size the trade log onto a dollar account (see below)
+- `GET /api/backtest/export/{job_id}` — download the trade log as CSV; optional query params `capital=1&initial_capital=10000&risk_pct=1&mode=compounding|fixed` add a `pnl_usd` column
+
+## Capital simulation
+
+A pure post-process over the backtest's R-multiples (no re-run, instant):
+
+- `initial_capital` — starting bankroll in dollars (default 10,000).
+- `risk_pct` — percent of the account risked per trade (default 1, max 50).
+- `mode` — `compounding` sizes each trade off the current equity
+  (`equity_{n} = equity_{n-1} × (1 + r_n × p)`); `fixed` risks the same dollar
+  amount every trade (`initial × p`).
+
+When enabled, the dashboard shows dollar figures alongside R everywhere:
+final equity, total P&L and return %, dollar profit factor, dollar max
+drawdown, a P&L column in the trade table, and an equity chart drawn in $
+with cumulative R overlaid on the right axis.
 
 ## Verified behavior (tested during build)
 
