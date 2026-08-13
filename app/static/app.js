@@ -111,6 +111,13 @@
       showDatasetMeta(data);
       $("btnGenerate").disabled = false;
     } catch(err){
+      // A failed upload must never leave the previous dataset active: the
+      // Generate button would silently re-run the OLD data and the report
+      // would appear unchanged, as if the upload had succeeded.
+      currentDatasetId = null;
+      $("btnGenerate").disabled = true;
+      $("datasetMeta").textContent = "Upload failed — no dataset loaded";
+      setStatus("Upload failed", false);
       alert("Error: " + err.message);
     } finally {
       wrap.hidden = true;
