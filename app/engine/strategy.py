@@ -40,7 +40,7 @@ class Params:
     # Stop-management: when price reaches 50% of the TP distance, move the SL.
     # "none" keeps the original SL, "breakeven" moves it to entry,
     # "half_risk" moves it to half the original risk distance.
-    sl_move_on_half_tp: Literal["none", "breakeven", "half_risk"] = "none"
+    sl_move_on_half_tp: Literal["none", "breakeven", "half_risk"] = "half_risk"
     pip_size: float = 0.01  # gold: 1 pip = $0.01 by common retail convention
 
 

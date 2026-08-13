@@ -69,7 +69,7 @@ class BacktestParams(BaseModel):
     entry_mode: str = "market"
     sl_pct_of_range: float = Field(0.5, ge=0.0, le=5.0)
     tp_rr: float = Field(2.0, gt=0.0)
-    sl_move_on_half_tp: Literal["none", "breakeven", "half_risk"] = "none"
+    sl_move_on_half_tp: Literal["none", "breakeven", "half_risk"] = "half_risk"
     spread_pips: float = Field(0.0, ge=0.0)
     slippage_pips: float = Field(0.0, ge=0.0)
     session_max_hours: float = Field(20.0, gt=0.0)
