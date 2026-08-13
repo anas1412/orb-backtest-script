@@ -335,6 +335,7 @@
     renderDowBreakdown(lastResult.breakdown_day_of_week, trades, sim ? sim.pnl : null);
     renderMonthBreakdown(lastResult.trades, sim ? sim.pnl : null);
     renderAvgMonthBreakdown(lastResult.trades, sim ? sim.pnl : null);
+    renderSlotBreakdown(lastResult.trades, sim ? sim.pnl : null);
     renderTable(lastResult.trades, sim ? sim.pnl : null);
     renderEquityCurve(lastResult.equity_curve, sim ? sim.curve : null, sim ? readCapitalParams().initial_capital : null);
     const sub = document.querySelector(".chart-panel .panel-sub");
@@ -639,6 +640,47 @@
       </div>`;
     });
     $("avgMonthBreakdown").innerHTML = rows.join("");
+  }
+
+  function renderSlotBreakdown(trades, pnl){
+    const list = $("slotBreakdown");
+    if (!trades || trades.length === 0){
+      list.innerHTML = `<div class="breakdown-row"><span class="label">No trades</span></div>`;
+      return;
+    }
+    const bySlot = {};
+    let anyTime = false;
+    trades.forEach((t, i) => {
+      if (!t.entry_time_utc) return;
+      const e = new Date(t.entry_time_utc);
+      if (isNaN(e.getTime())) return;
+      anyTime = true;
+      const slot = String(e.getUTCHours()).padStart(2, "0") + ":" +
+        String(Math.floor(e.getUTCMinutes() / 15) * 15).padStart(2, "0");
+      const v = bySlot[slot] || { n: 0, r: 0, usd: 0 };
+      v.n++;
+      v.r += t.r_multiple;
+      v.usd += pnl ? (pnl[i] || 0) : 0;
+      bySlot[slot] = v;
+    });
+    if (!anyTime){
+      list.innerHTML = `<div class="breakdown-row"><span class="label">No time data</span></div>`;
+      return;
+    }
+    const rows = Object.keys(bySlot).sort().map(slot => {
+      const v = bySlot[slot];
+      const avgR = v.r / v.n;
+      const rClass = v.r > 0 ? "pos" : (v.r < 0 ? "neg" : "");
+      const avgCls = avgR > 0 ? "pos" : (avgR < 0 ? "neg" : "");
+      const usd = pnl
+        ? ` · <span class="dim">${fmtUsdSigned(v.usd)} · ${fmtUsdSigned(v.usd / v.n)} avg</span>`
+        : "";
+      return `<div class="breakdown-row">
+        <span class="label">${slot}</span>
+        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)}R avg</span>${usd}</span>
+      </div>`;
+    });
+    list.innerHTML = rows.join("");
   }
 
   function renderTable(trades, pnl){

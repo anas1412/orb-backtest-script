@@ -475,6 +475,9 @@ body{
 .two-col{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
 @media (max-width: 700px){ .two-col{ grid-template-columns: 1fr; } }
 .two-col .panel{ padding: 16px 20px; }
+.three-col{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:18px; align-items:start; }
+@media (max-width: 900px){ .three-col{ grid-template-columns: 1fr; } }
+.three-col .panel{ padding: 16px 20px; }
 
 .breakdown-list{ display:flex; flex-direction:column; gap:10px; }
 .breakdown-row{
