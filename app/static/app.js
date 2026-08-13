@@ -42,6 +42,61 @@
     return (n > 0 ? "+" : "") + fmtUsd(n);
   }
 
+  // Map raw server error strings to human copy. Server details often carry a
+  // "<filename>.csv: <detail>" prefix; we keep the filename and explain the
+  // rest in plain terms.
+  function friendlyError(msg){
+    if (!msg) return "Something went wrong.";
+    const s = String(msg);
+    const m = s.match(/^(.+\.csv):\s*([\s\S]+)$/i);
+    const file = m ? m[1] : null;
+    const body = m ? m[2] : s;
+    const what = file ? `"${file}"` : "That file";
+    if (body.includes("auto-detect the timestamps' timezone")){
+      return `${what} has no full weekend inside it (a Friday close followed by a Sunday reopen), so the timezone can't be auto-detected from the data. Choose the actual timezone in the "Raw timestamp TZ" field and upload again.`;
+    }
+    if (body.includes("Could not parse CSV")){
+      return `${what} couldn't be read as a CSV. Double-check the file format.`;
+    }
+    if (body.includes("missing required columns")){
+      return `${what} is missing expected columns (timestamp, open, high, low, close).`;
+    }
+    if (body.includes("could not be parsed")){
+      return `${what} has timestamps the app couldn't parse.`;
+    }
+    if (body.includes("inconsistent OHLC")){
+      return `${what} has rows with impossible prices (high/low don't bound open/close).`;
+    }
+    if (body.includes("Could not localize naive timestamps")){
+      return "The timezone name you picked isn't recognized. Try 'UTC' or an Etc/GMT offset from the list.";
+    }
+    if (body.includes("No valid bars") || body.includes("No files were loaded")){
+      return `${what} contained no usable bars.`;
+    }
+    return s;
+  }
+
+  function showToast(title, message, type){
+    const container = $("toasts");
+    if (!container) return;
+    const toast = document.createElement("div");
+    toast.className = "toast toast-" + (type || "error");
+    toast.innerHTML =
+      `<div class="toast-head"><span class="toast-title"></span>` +
+      `<button type="button" class="toast-close" aria-label="Dismiss">×</button></div>` +
+      `<div class="toast-body"></div>`;
+    toast.querySelector(".toast-title").textContent = title;
+    toast.querySelector(".toast-body").textContent = message;
+    const remove = () => toast.remove();
+    toast.querySelector(".toast-close").addEventListener("click", remove);
+    container.appendChild(toast);
+    let timer = setTimeout(remove, type === "error" ? 15000 : 6000);
+    toast.addEventListener("mouseenter", () => clearTimeout(timer));
+    toast.addEventListener("mouseleave", () => {
+      timer = setTimeout(remove, type === "error" ? 15000 : 6000);
+    });
+  }
+
   function fmtAxis(v){
     if (Math.abs(v) >= 1000) return (v / 1000).toFixed(1) + "k";
     return v.toFixed(1);
@@ -148,7 +203,9 @@
     const el = $("datasetMeta");
     const nFiles = (data.files || []).length;
     const perFile = (data.files || []).map(f =>
-      `<span class="meta-file">${f.source} — ${f.rows.toLocaleString()} bars</span>`).join("");
+      `<span class="meta-file">${f.source} — ${f.rows.toLocaleString()} bars` +
+      (f.tz_note ? ` — <span class="meta-tz">${f.tz_note}</span>` : "") +
+      `</span>`).join("");
     if (el){
       el.innerHTML =
         `${data.symbol} · ${nFiles} file${nFiles === 1 ? "" : "s"} · ` +
@@ -214,7 +271,7 @@
       $("btnClear").disabled = true;
       $("datasetMeta").textContent = "Upload failed — no dataset loaded";
       setStatus("Upload failed", false);
-      alert("Error: " + err.message);
+      showToast("Upload failed", friendlyError(err.message), "error");
     } finally {
       wrap.hidden = true;
     }
@@ -240,7 +297,7 @@
       $("btnGenerate").disabled = true;
       $("datasetMeta").textContent = "Demo load failed";
       setStatus("Demo load failed", false);
-      alert("Error: " + err.message);
+      showToast("Demo data failed to load", friendlyError(err.message), "error");
     } finally {
       btn.disabled = false;
     }
@@ -335,6 +392,7 @@
         try{
           const err = await res.json();
           setStatus(apiErrorMessage(err), false);
+          showToast("Capital simulation failed", apiErrorMessage(err), "error");
         } catch(e){ /* no JSON body */ }
         return;
       }
@@ -811,7 +869,7 @@
 
   async function handleGenerate(opts){
     if (!currentDatasetId){
-      alert("Load a dataset first.");
+      showToast("No dataset loaded", "Upload data or load the demo dataset first.", "info");
       return;
     }
     const btn = $("btnGenerate");
@@ -891,7 +949,7 @@
 
       await refreshSim();
     } catch(e){
-      alert("Error: " + e.message);
+      showToast("Backtest failed", friendlyError(e.message), "error");
     } finally {
       if (elapsedTimer) clearInterval(elapsedTimer);
       btn.disabled = false;

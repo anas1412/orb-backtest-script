@@ -254,7 +254,7 @@ def load_ohlcv_csv(
     if ts.dt.tz is not None:
         # Already tz-aware; convert straight to UTC, ignore source_tz.
         ts_utc = ts.dt.tz_convert("UTC")
-        tz_note = "Timestamps were already timezone-aware; converted directly to UTC."
+        tz_note = "Timezone-aware; converted to UTC"
     else:
         # Naive timestamps: the caller either names the source timezone, or
         # opts into auto-detection ("auto") anchored on the weekend gap.
@@ -271,10 +271,7 @@ def load_ohlcv_csv(
             ts_utc = ts.dt.tz_localize(timezone(offset)).dt.tz_convert("UTC")
             off_h = int(offset.total_seconds() // 3600)
             label = "UTC" if off_h == 0 else f"UTC{off_h:+d}h"
-            tz_note = (
-                f"Auto-detected from weekend gaps: raw timestamps appear to be "
-                f"{label}; normalized to UTC."
-            )
+            tz_note = f"Auto-detected: {label} (weekend gaps)"
         else:
             try:
                 ts_utc = ts.dt.tz_localize(source_tz).dt.tz_convert("UTC")
@@ -282,7 +279,7 @@ def load_ohlcv_csv(
                 raise DataValidationError(
                     f"Could not localize naive timestamps using source_tz='{source_tz}': {exc}"
                 ) from exc
-            tz_note = f"Naive timestamps localized as '{source_tz}' then converted to UTC."
+            tz_note = f"Localized as '{source_tz}' → UTC"
 
     out = pd.DataFrame({
         "timestamp": ts_utc,
