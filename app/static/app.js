@@ -273,6 +273,10 @@
       if (!res.ok){
         lastSim = null;
         renderAll();
+        try{
+          const err = await res.json();
+          setStatus(err.detail || "Capital simulation failed", false);
+        } catch(e){ /* no JSON body */ }
         return;
       }
       lastSim = await res.json();

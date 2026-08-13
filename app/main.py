@@ -336,8 +336,8 @@ def _serialize_result(result: BacktestResult, job_id: str, loaded: LoadedData, p
 
 class CapitalSimParams(BaseModel):
     initial_capital: float = Field(10000.0, gt=0.0)
-    risk_pct: float = Field(1.0, gt=0.0, le=50.0)
-    mode: Literal["fixed", "compounding"] = "compounding"
+    risk_pct: float = Field(1.0, gt=0.0, lt=10.0)
+    mode: Literal["fixed", "compounding"] = "fixed"
 
 
 @app.post("/api/backtest/simulate/{job_id}")
@@ -368,7 +368,7 @@ async def export_trades_csv(
     capital: int = 0,
     initial_capital: float = 10000.0,
     risk_pct: float = 1.0,
-    mode: Literal["fixed", "compounding"] = "compounding",
+    mode: Literal["fixed", "compounding"] = "fixed",
 ):
     result = RESULT_STORE.get(job_id)
     if result is None:
