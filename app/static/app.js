@@ -343,21 +343,18 @@
 
   function bestWorstPeriods(trades){
     if (!trades || trades.length === 0) return null;
-    const byDay = {}, byMonth = {};
+    const byDow = {}, byMonth = {};
     trades.forEach(t => {
-      byDay[t.date] = (byDay[t.date] || 0) + t.r_multiple;
-      const mk = t.date.slice(0, 7);
+      const date = new Date(t.date + "T00:00:00Z");
+      const dow = date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+      byDow[dow] = (byDow[dow] || 0) + t.r_multiple;
+      const mk = date.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
       byMonth[mk] = (byMonth[mk] || 0) + t.r_multiple;
     });
     const best = o => Object.entries(o).reduce((a, b) => b[1] > a[1] ? b : a);
     const worst = o => Object.entries(o).reduce((a, b) => b[1] < a[1] ? b : a);
-    return { bestDay: best(byDay), worstDay: worst(byDay), bestMonth: best(byMonth), worstMonth: worst(byMonth) };
+    return { bestDow: best(byDow), worstDow: worst(byDow), bestMonth: best(byMonth), worstMonth: worst(byMonth) };
   }
-
-  const dayLabel = date => new Date(date + "T00:00:00Z")
-    .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-  const monthLabel = key => new Date(key + "-01T00:00:00Z")
-    .toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
   function renderStats(stats, sim){
     const totalRClass = stats.total_r > 0 ? "pos" : (stats.total_r < 0 ? "neg" : "neutral");
@@ -384,22 +381,22 @@
       statCardHtml("Longest loss streak", stats.longest_loss_streak, "neg"));
 
     const bw = bestWorstPeriods(lastResult.trades);
-    const bwCard = (label, bestV, worstV, worstDate) => `
+    const bwCard = (label, bestName, bestV, worstV, worstName) => `
       <div class="stat-card neutral bw-card">
         <div class="stat-label">${label}</div>
-        <div class="stat-value pos">${bestV}</div>
-        <div class="stat-sub bw-worst">Worst: ${worstV} · ${worstDate}</div>
+        <div class="stat-value pos"><span class="bw-name">${bestName}</span><span class="bw-r">${bestV}</span></div>
+        <div class="stat-sub bw-worst">Worst: ${worstV} · ${worstName}</div>
       </div>`;
     if (bw){
-      const [bd, wd] = [bw.bestDay, bw.worstDay];
+      const [bd, wd] = [bw.bestDow, bw.worstDow];
       const [bm, wm] = [bw.bestMonth, bw.worstMonth];
       cards.push(
         bwCard("Best / worst day",
-          (bd[1] > 0 ? "+" : "") + fmt(bd[1]) + "R",
-          fmt(wd[1]) + "R", dayLabel(wd[0])),
+          bd[0], (bd[1] > 0 ? "+" : "") + fmt(bd[1]) + "R",
+          fmt(wd[1]) + "R", wd[0]),
         bwCard("Best / worst month",
-          (bm[1] > 0 ? "+" : "") + fmt(bm[1]) + "R",
-          fmt(wm[1]) + "R", monthLabel(wm[0])));
+          bm[0], (bm[1] > 0 ? "+" : "") + fmt(bm[1]) + "R",
+          fmt(wm[1]) + "R", wm[0]));
     } else {
       cards.push(
         statCardHtml("Best / worst day", "—", "neutral"),
