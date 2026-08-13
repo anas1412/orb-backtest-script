@@ -134,17 +134,17 @@ def _dataset_response(dataset_id: str, loaded: LoadedData) -> dict:
     }
 
 
-DEMO_DATASET_GLOB = "datasets/DAT_MT_XAUUSD_M1_*.csv"
+BUNDLED_DATASET_GLOB = "datasets/DAT_MT_XAUUSD_M1_*.csv"
 
 
-def _demo_files() -> list[Path]:
-    return sorted(BASE_DIR.parent.glob(DEMO_DATASET_GLOB))
+def _bundled_files() -> list[Path]:
+    return sorted(BASE_DIR.parent.glob(BUNDLED_DATASET_GLOB))
 
 
-def _demo_coverage_label() -> str | None:
-    """Human range of the bundled demo files from their names, e.g. 'Jan 2026 → Jul 2026'."""
+def _bundled_coverage_label() -> str | None:
+    """Human range of the bundled data files from their names, e.g. 'Jan 2026 → Jul 2026'."""
     months: list[tuple[int, int | None]] = []
-    for p in _demo_files():
+    for p in _bundled_files():
         m = re.search(r"M1_(\d{4})(\d{2})?\.csv$", p.name)
         if not m:
             continue
@@ -162,18 +162,18 @@ def _demo_coverage_label() -> str | None:
     return label
 
 
-@app.get("/api/data/demo")
-async def demo_meta():
-    """Report the bundled demo dataset's coverage so the UI can label its button."""
-    return {"coverage": _demo_coverage_label()}
+@app.get("/api/data/bundled")
+async def bundled_meta():
+    """Report the bundled data's coverage so the UI can label its button."""
+    return {"coverage": _bundled_coverage_label()}
 
 
-@app.post("/api/data/demo")
-async def load_demo_data():
-    """Load every bundled demo dataset (gold M1, 2026) into the store."""
-    paths = _demo_files()
+@app.post("/api/data/bundled")
+async def load_bundled_data():
+    """Load every bundled dataset (gold M1, 2026) into the store."""
+    paths = _bundled_files()
     if not paths:
-        raise HTTPException(status_code=404, detail="Demo dataset is not bundled with this deployment.")
+        raise HTTPException(status_code=404, detail="No bundled datasets are available with this deployment.")
     loaded_list: list[LoadedData] = []
     for p in paths:
         try:

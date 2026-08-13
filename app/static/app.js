@@ -277,14 +277,14 @@
     }
   }
 
-  async function handleDemo(){
-    const btn = $("btnDemo");
+  async function handleBundled(){
+    const btn = $("btnBundled");
     btn.disabled = true;
     try{
-      const res = await fetch("/api/data/demo", { method: "POST" });
+      const res = await fetch("/api/data/bundled", { method: "POST" });
       if (!res.ok){
         const err = await res.json();
-        throw new Error(err.detail || "Demo dataset unavailable");
+        throw new Error(err.detail || "Bundled data unavailable");
       }
       const data = await res.json();
       currentDatasetId = data.dataset_id;
@@ -295,9 +295,9 @@
     } catch(err){
       currentDatasetId = null;
       $("btnGenerate").disabled = true;
-      $("datasetMeta").textContent = "Demo load failed";
-      setStatus("Demo load failed", false);
-      showToast("Demo data failed to load", friendlyError(err.message), "error");
+      $("datasetMeta").textContent = "Bundled data load failed";
+      setStatus("Bundled data load failed", false);
+      showToast("Bundled data failed to load", friendlyError(err.message), "error");
     } finally {
       btn.disabled = false;
     }
@@ -869,7 +869,7 @@
 
   async function handleGenerate(opts){
     if (!currentDatasetId){
-      showToast("No dataset loaded", "Upload data or load the demo dataset first.", "info");
+      showToast("No dataset loaded", "Upload data or load the bundled dataset first.", "info");
       return;
     }
     const btn = $("btnGenerate");
@@ -991,20 +991,20 @@
   $("fileUpload").addEventListener("change", handleUpload);
   $("btnGenerate").addEventListener("click", handleGenerate);
   $("btnClear").addEventListener("click", handleClear);
-  $("btnDemo").addEventListener("click", handleDemo);
+  $("btnBundled").addEventListener("click", handleBundled);
   $("btnExport").addEventListener("click", handleExport);
 
-  async function loadDemoLabel(){
-    const label = $("demoLabel");
+  async function loadBundledLabel(){
+    const label = $("bundledLabel");
     if (!label) return;
     try{
-      const res = await fetch("/api/data/demo");
+      const res = await fetch("/api/data/bundled");
       if (!res.ok) return;
       const meta = await res.json();
-      if (meta.coverage) label.textContent = "Try demo data (" + meta.coverage + ")";
+      if (meta.coverage) label.textContent = "Load bundled data (" + meta.coverage + ")";
     } catch(e){ /* non-fatal: button keeps its default text */ }
   }
-  loadDemoLabel();
+  loadBundledLabel();
 
   function syncAllDaysToggle(){
     const all = $("allDays").checked;

@@ -272,7 +272,7 @@ body{
   background: var(--panel-raised); color: var(--text-faint); border-color: var(--border);
   cursor: not-allowed;
 }
-.btn-demo{
+.btn-bundled{
   width: 100%;
   background: var(--panel-raised);
   color: var(--gold-bright);
@@ -280,9 +280,9 @@ body{
   margin: 4px 0 14px;
   padding: 11px 16px;
 }
-.btn-demo:hover:not(:disabled){ background: var(--gold); color: #16130a; }
-.btn-demo:disabled{ opacity: 0.45; cursor: not-allowed; }
-.demo-divider{
+.btn-bundled:hover:not(:disabled){ background: var(--gold); color: #16130a; }
+.btn-bundled:disabled{ opacity: 0.45; cursor: not-allowed; }
+.bundled-divider{
   display: block;
   text-align: center;
   font-family: var(--font-mono);
