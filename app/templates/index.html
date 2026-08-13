@@ -76,6 +76,11 @@
           </div>
           <p class="hint">Select one or more M1 CSV files. Each file can be a different format or source (standard <code>timestamp,open,high,low,close</code>, MetaTrader headerless exports, split date/time columns) — every file is parsed individually, converted to UTC, then merged into a single dataset. Overlapping bars keep the first file's copy. Leave <code>auto</code> to infer the timezone from weekend gaps (gold closes ~21:00 UTC Fri, reopens ~22:00 UTC Sun). If detection fails, set the source's raw timezone (e.g. <code>EET</code>) — the loader will not silently guess. Backtests run over the entire merged dataset.</p>
           <div class="dataset-meta" id="datasetMeta">No dataset loaded</div>
+          <div class="dataset-actions">
+            <button class="btn btn-ghost" id="btnClear" type="button" disabled>
+              <i data-lucide="trash-2"></i>Clear data
+            </button>
+          </div>
         </section>
       </div>
 

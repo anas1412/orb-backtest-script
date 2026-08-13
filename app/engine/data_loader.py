@@ -83,6 +83,7 @@ class LoadedData:
     symbol: str
     source: str
     tz_note: str              # human-readable note on how timezone was resolved
+    parts: list["LoadedData"] | None = None  # per-file pieces when merged from several files
 
 
 def merge_loaded(loaded_list: list[LoadedData]) -> LoadedData:
@@ -93,7 +94,9 @@ def merge_loaded(loaded_list: list[LoadedData]) -> LoadedData:
     index. The merged frame is re-sorted by timestamp and duplicate
     timestamps are dropped keeping the FIRST occurrence, so when files
     overlap in time the earlier file in the list wins. A human-readable
-    source label and tz note are joined from all inputs.
+    source label and tz note are joined from all inputs. The original
+    per-file pieces are retained in ``parts`` so a file can later be
+    removed from the merged set.
     """
     if not loaded_list:
         raise DataValidationError("No files were loaded.")
@@ -107,6 +110,7 @@ def merge_loaded(loaded_list: list[LoadedData]) -> LoadedData:
         symbol=loaded_list[0].symbol,
         source=" + ".join(l.source for l in loaded_list),
         tz_note=" | ".join(l.tz_note for l in loaded_list),
+        parts=list(loaded_list),
     )
 
 

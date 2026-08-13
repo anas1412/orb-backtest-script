@@ -83,6 +83,29 @@ async def index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
 
+def _dataset_response(dataset_id: str, loaded: LoadedData) -> dict:
+    parts = loaded.parts or [loaded]
+    return {
+        "dataset_id": dataset_id,
+        "symbol": loaded.symbol,
+        "source": loaded.source,
+        "tz_note": loaded.tz_note,
+        "files": [
+            {
+                "source": p.source,
+                "rows": len(p.df),
+                "start": p.df["timestamp"].min().isoformat(),
+                "end": p.df["timestamp"].max().isoformat(),
+                "tz_note": p.tz_note,
+            }
+            for p in parts
+        ],
+        "rows": len(loaded.df),
+        "start": loaded.df["timestamp"].min().isoformat(),
+        "end": loaded.df["timestamp"].max().isoformat(),
+    }
+
+
 @app.post("/api/data/upload")
 async def upload_data(
     files: list[UploadFile] = File(...),
@@ -93,7 +116,6 @@ async def upload_data(
         raise HTTPException(status_code=400, detail="No files uploaded.")
 
     loaded_list: list[LoadedData] = []
-    file_reports = []
     for f in files:
         try:
             content = await f.read()
@@ -101,28 +123,33 @@ async def upload_data(
         except DataValidationError as e:
             raise HTTPException(status_code=400, detail=f"{f.filename}: {e}")
         loaded_list.append(loaded)
-        file_reports.append({
-            "source": loaded.source,
-            "rows": len(loaded.df),
-            "start": loaded.df["timestamp"].min().isoformat(),
-            "end": loaded.df["timestamp"].max().isoformat(),
-            "tz_note": loaded.tz_note,
-        })
 
     combined = merge_loaded(loaded_list)
     dataset_id = str(uuid.uuid4())
     DATA_STORE[dataset_id] = combined
 
-    return {
-        "dataset_id": dataset_id,
-        "symbol": combined.symbol,
-        "source": combined.source,
-        "tz_note": combined.tz_note,
-        "files": file_reports,
-        "rows": len(combined.df),
-        "start": combined.df["timestamp"].min().isoformat(),
-        "end": combined.df["timestamp"].max().isoformat(),
-    }
+    return _dataset_response(dataset_id, combined)
+
+
+@app.post("/api/data/{dataset_id}/files/remove")
+async def remove_dataset_file(dataset_id: str, source: str = Form(...)):
+    """Drop one file from a multi-file dataset and re-merge the rest in place."""
+    loaded = DATA_STORE.get(dataset_id)
+    if loaded is None:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    parts = loaded.parts
+    if not parts or len(parts) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="This dataset has a single file — nothing to remove. Re-upload without that file.",
+        )
+    remaining = [p for p in parts if p.source != source]
+    if len(remaining) == len(parts):
+        raise HTTPException(status_code=404, detail=f"File '{source}' is not part of this dataset")
+
+    combined = merge_loaded(remaining)
+    DATA_STORE[dataset_id] = combined
+    return _dataset_response(dataset_id, combined)
 
 
 @app.get("/api/data/status/{dataset_id}")
@@ -130,15 +157,16 @@ async def data_status(dataset_id: str):
     loaded = DATA_STORE.get(dataset_id)
     if loaded is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    return {
-        "dataset_id": dataset_id,
-        "symbol": loaded.symbol,
-        "source": loaded.source,
-        "tz_note": loaded.tz_note,
-        "rows": len(loaded.df),
-        "start": loaded.df["timestamp"].min().isoformat(),
-        "end": loaded.df["timestamp"].max().isoformat(),
-    }
+    return _dataset_response(dataset_id, loaded)
+
+
+@app.delete("/api/data/{dataset_id}")
+async def delete_dataset(dataset_id: str):
+    """Remove a dataset (and its in-memory DataFrame) entirely."""
+    if dataset_id not in DATA_STORE:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    del DATA_STORE[dataset_id]
+    return {"ok": True, "dataset_id": dataset_id}
 
 
 @app.post("/api/backtest/run")

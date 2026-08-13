@@ -118,18 +118,40 @@
       currentDatasetId = data.dataset_id;
       showDatasetMeta(data);
       $("btnGenerate").disabled = false;
+      $("btnClear").disabled = false;
     } catch(err){
       // A failed upload must never leave the previous dataset active: the
       // Generate button would silently re-run the OLD data and the report
       // would appear unchanged, as if the upload had succeeded.
       currentDatasetId = null;
       $("btnGenerate").disabled = true;
+      $("btnClear").disabled = true;
       $("datasetMeta").textContent = "Upload failed — no dataset loaded";
       setStatus("Upload failed", false);
       alert("Error: " + err.message);
     } finally {
       wrap.hidden = true;
     }
+  }
+
+  async function handleClear(){
+    const id = currentDatasetId;
+    if (id){
+      // Best-effort: drop the dataset server-side to free memory.
+      try { await fetch(`/api/data/${id}`, { method: "DELETE" }); }
+      catch(err){ /* local reset continues regardless */ }
+    }
+    currentDatasetId = null;
+    currentJobId = null;
+    $("btnGenerate").disabled = true;
+    $("btnClear").disabled = true;
+    $("datasetMeta").innerHTML = "No dataset loaded";
+    setStatus("No dataset loaded", false);
+    $("resultsSection").style.display = "none";
+    $("emptyState").style.display = "";
+    const input = $("fileUpload");
+    input.value = "";
+    equityState = null;
   }
 
   function statCardHtml(label, value, cls, sub){
@@ -394,6 +416,7 @@
   // Wire up events
   $("fileUpload").addEventListener("change", handleUpload);
   $("btnGenerate").addEventListener("click", handleGenerate);
+  $("btnClear").addEventListener("click", handleClear);
   $("btnExport").addEventListener("click", handleExport);
 
   // Equity chart hover: crosshair + tooltip with date and cumulative R

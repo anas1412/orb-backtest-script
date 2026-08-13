@@ -394,6 +394,22 @@ body{
   color: var(--text-dim);
   font-size: 10px;
 }
+.dataset-actions{
+  margin-top: 8px;
+  display: flex;
+}
+.dataset-actions .btn-ghost{
+  margin-left: auto;
+  color: var(--text-dim);
+}
+.dataset-actions .btn-ghost:hover:not(:disabled){
+  border-color: var(--neg);
+  color: var(--neg-bright);
+}
+.dataset-actions .btn-ghost:disabled{
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* ---------- Two column ---------- */
 .two-col{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
