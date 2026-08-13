@@ -117,10 +117,11 @@
     }
   }
 
-  function statCardHtml(label, value, cls){
+  function statCardHtml(label, value, cls, sub){
     return `<div class="stat-card ${cls}">
       <div class="stat-label">${label}</div>
       <div class="stat-value ${cls === 'pos' || cls === 'neg' ? cls : ''}">${value}</div>
+      ${sub || ""}
     </div>`;
   }
 
@@ -133,7 +134,9 @@
       statCardHtml("Win rate", fmtPct(stats.win_rate) + (stats.win_rate_no_be !== null ? ` <span class="stat-sub">ex-BE ${fmtPct(stats.win_rate_no_be)}</span>` : ""), "neutral"),
       statCardHtml("Total R", (stats.total_r > 0 ? "+" : "") + fmt(stats.total_r), totalRClass),
       statCardHtml("Avg R / trade", (stats.average_r > 0 ? "+" : "") + fmt(stats.average_r), avgRClass),
-      statCardHtml("Profit factor", stats.profit_factor !== null ? fmt(stats.profit_factor) : "—", "neutral"),
+      statCardHtml("Profit factor", stats.profit_factor !== null ? fmt(stats.profit_factor) : "—",
+        "neutral",
+        stats.expectancy_r !== null ? `<span class="stat-sub">EV ${stats.expectancy_r > 0 ? "+" : ""}${fmt(stats.expectancy_r)}R / trade</span>` : ""),
       statCardHtml("Max drawdown", fmt(stats.max_drawdown_r) + "R", "neg"),
       statCardHtml("Longest win streak", stats.longest_win_streak, "pos"),
       statCardHtml("Longest loss streak", stats.longest_loss_streak, "neg"),
