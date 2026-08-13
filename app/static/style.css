@@ -541,10 +541,6 @@ body{
   background: var(--panel);
   border-color: var(--border);
 }
-.cal-day.week-total .cal-num{
-  color: var(--gold);
-  font-weight: 700;
-}
 .cal-val.cal-flat{
   background: transparent;
   color: var(--text-faint);

@@ -449,7 +449,7 @@
       const has = (useUsd ? weekUsd : weekR) !== 0;
       const val = useUsd ? weekUsd : weekR;
       let cls = "cal-day week-total";
-      let inner = `<span class="cal-num">Σ</span>`;
+      let inner = "";
       if (has){
         const alpha = Math.min(1, 0.08 + 0.30 * (Math.abs(val) / absMax));
         const color = val > 0 ? `rgba(107,197,147,${alpha})` : `rgba(217,114,103,${alpha})`;
