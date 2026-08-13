@@ -397,14 +397,14 @@
       statCardHtml("Longest loss streak", stats.longest_loss_streak, "neg"));
 
     const bw = bestWorstPeriods(lastResult.trades);
-    const pairCard = (label, bestPair, worstPair) => bestPair
-      ? statCardHtml(label,
-          `<span class="bw-big">${bestPair[0]} · ${(bestPair[1] > 0 ? "+" : "")}${fmt(bestPair[1])}R</span>`,
-          "pos",
-          worstPair && bestPair[0] === worstPair[0]
-            ? `<span class="stat-sub bw-worst">Worst: —</span>`
-            : `<span class="stat-sub bw-worst">Worst: ${worstPair[0]} · ${fmt(worstPair[1])}R</span>`)
-      : statCardHtml(label, "—", "neutral");
+    const pairCard = (label, bestPair, worstPair) => bestPair && worstPair && bestPair[0] === worstPair[0]
+      ? statCardHtml(label, "—", "neutral")
+      : bestPair
+        ? statCardHtml(label,
+            `<span class="bw-big">${bestPair[0]} · ${(bestPair[1] > 0 ? "+" : "")}${fmt(bestPair[1])}R</span>`,
+            "pos",
+            `<span class="stat-sub bw-worst">Worst: ${worstPair[0]} · ${fmt(worstPair[1])}R</span>`)
+        : statCardHtml(label, "—", "neutral");
     if (bw){
       cards.push(
         pairCard("Best / worst time", bw.bestSlot, bw.worstSlot),
