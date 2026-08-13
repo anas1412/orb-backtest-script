@@ -405,11 +405,8 @@ body{
 }
 .stat-verdict{ letter-spacing: 0; line-height: 1.45; }
 
-.bw-card .stat-label{ text-align: center; }
-.bw-card .stat-value{ text-align: center; }
-.bw-name{ display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-.bw-r{ display: block; font-size: 28px; }
-.bw-worst{ text-align: center; color: var(--neg-bright); font-size: 11px; margin-top: 6px; }
+.bw-big{ font-size: 24px; }
+.bw-worst{ color: var(--neg-bright); font-size: 11px; margin-top: 6px; }
 
 /* ---------- Chart ---------- */
 .chart-panel{ padding: 18px 22px; position: relative; }
