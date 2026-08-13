@@ -16,7 +16,7 @@ UI at `http://localhost:8000`. No test suite, no pytest, no lint/typecheck confi
 
 - `app/engine/` is framework-agnostic and importable standalone (notebook/script): `data_loader` (CSV -> UTC DataFrame) -> `session` (daily windows, trading days) -> `strategy` (breakout detection, entry modes, SL/TP) -> `backtester` (per-day loop, exit simulation) -> `stats` (summary, trade log, equity curve).
 - `app/main.py` is a thin transport layer: routes call the engine, then keep results in module-level in-memory dicts (`DATA_STORE`, `RESULT_STORE`). Everything is lost on restart; this is a single-user local tool.
-- `plan.md` is the authoritative strategy spec; engine docstrings say "follow plan.md exactly". Reconcile behavior changes against it.
+- README's "Verified behavior" section is the strategy spec; the engine docstrings are the closest thing to an authoritative description of intended behavior. Reconcile behavior changes against them.
 - Frontend is vanilla JS + a hand-rolled canvas equity chart (no chart library).
 
 ## Invariants (easy to break, deliberately implemented)

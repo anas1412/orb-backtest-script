@@ -1,8 +1,7 @@
 # Asia Range Breakout — Gold (XAUUSD) Backtester
 
 A Python + FastAPI backtesting tool for an Asia-session opening-range breakout
-strategy on Gold, M1 timeframe. All logic operates in UTC internally, per the
-project plan (`plan.md`, if included alongside this app).
+strategy on Gold, M1 timeframe. All logic operates in UTC internally.
 
 ## What it does
 
