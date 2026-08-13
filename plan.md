@@ -51,7 +51,7 @@ Two configurable modes (parameter: `entry_mode`):
 
 ### Step 5 — Take Profit
 - Default: 1R (i.e., TP distance = SL distance × 1).
-- Parameter: `tp_rr` (default `1.0`), any positive number (e.g. `2.0` = 2R).
+- Parameter: `tp_rr` (default `2.0`), any positive number (e.g. `2.0` = 2R).
 
 ### Step 6 — Trade management
 - One trade per day maximum (only the first valid breakout is traded).
@@ -134,7 +134,7 @@ A single-page dashboard UI:
 | `entry_mode` | `market` | or `limit` |
 | `sl_anchor` | range midpoint | fixed rule, not a parameter |
 | `sl_pct_of_range` | 0.5 | fraction of range size from midpoint; 0.5 = midpoint itself, adjustable |
-| `tp_rr` | 1.0 | risk:reward multiple, any positive number |
+| `tp_rr` | 2.0 | risk:reward multiple, any positive number |
 | `spread_pips` | 0 | execution cost, off by default |
 | `slippage_pips` | 0 | execution cost, off by default |
 | `session_max_hours` | 20 | force-close open trades after this many hours from entry |

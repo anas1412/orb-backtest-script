@@ -32,7 +32,7 @@ class Params:
     breakout_search_minutes: int = 180
     entry_mode: EntryMode = "market"
     sl_pct_of_range: float = 0.5
-    tp_rr: float = 1.0
+    tp_rr: float = 2.0
     spread_pips: float = 0.0
     slippage_pips: float = 0.0
     session_max_hours: float = 20.0
