@@ -37,10 +37,12 @@ class Params:
     slippage_pips: float = 0.0
     session_max_hours: float = 20.0
     skip_weekends: bool = True
-    # Stop-management: when price reaches 50% of the TP distance, move the SL.
-    # "none" keeps the original SL, "breakeven" moves it to entry,
-    # "half_risk" moves it to half the original risk distance.
+    # Stop-management: when price reaches `sl_move_trigger_pct` of the TP
+    # distance (default 50%), move the SL. "none" keeps the original SL,
+    # "breakeven" moves it to entry, "half_risk" moves it to half the
+    # original risk distance.
     sl_move_on_half_tp: Literal["none", "breakeven", "half_risk"] = "half_risk"
+    sl_move_trigger_pct: float = 0.5
     pip_size: float = 0.01  # gold: 1 pip = $0.01 by common retail convention
 
 

@@ -31,6 +31,7 @@
       sl_pct_of_range: parseFloat($("slPct").value),
       tp_rr: parseFloat($("tpRR").value),
       sl_move_on_half_tp: $("slMove").value,
+      sl_move_trigger_pct: parseInt($("slMovePct").value, 10) / 100,
       spread_pips: parseFloat($("spreadPips").value),
       slippage_pips: parseFloat($("slippagePips").value),
       session_max_hours: parseFloat($("sessionMaxHours").value),
@@ -52,7 +53,7 @@
       `Stop loss sits at <b>${p.sl_pct_of_range}× range</b> from the midpoint ` +
       `(0.5 = exact midpoint), take profit at <b>${p.tp_rr}R</b>. ` +
       (p.sl_move_on_half_tp !== "none"
-        ? `When price reaches 50% of the target, the stop moves to <b>${p.sl_move_on_half_tp === "breakeven" ? "breakeven" : "half risk"}</b>. `
+        ? `When price reaches ${Math.round(p.sl_move_trigger_pct * 100)}% of the target, the stop moves to <b>${p.sl_move_on_half_tp === "breakeven" ? "breakeven" : "half risk"}</b>. `
         : "") +
       `Trades are force-closed after <b>${p.session_max_hours}h</b> if neither level is hit. ` +
       (p.skip_weekends ? "Weekends are skipped." : "Weekends are included.");

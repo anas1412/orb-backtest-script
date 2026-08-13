@@ -58,21 +58,22 @@ def _half_tp_levels(setup, params: Params) -> tuple[float | None, float | None]:
     Stop-management levels for the half-TP rule.
 
     Returns (trigger_price, moved_sl_price), or (None, None) when the rule is
-    disabled. The trigger is the price that means the trade has banked 50% of
-    the distance to TP: entry +- 0.5 * tp_rr * risk_distance.
+    disabled. The trigger is the price that means the trade has banked
+    `sl_move_trigger_pct` of the distance to TP (default 50%): entry +-
+    sl_move_trigger_pct * tp_rr * risk_distance.
     """
     if params.sl_move_on_half_tp == "none":
         return None, None
 
-    half_tp_dist = 0.5 * params.tp_rr * setup.risk_distance
+    trigger_dist = params.sl_move_trigger_pct * params.tp_rr * setup.risk_distance
     if setup.direction == "long":
-        trigger = setup.entry_price + half_tp_dist
+        trigger = setup.entry_price + trigger_dist
         if params.sl_move_on_half_tp == "breakeven":
             moved = setup.entry_price
         else:  # half_risk: half the original risk distance away from entry
             moved = setup.entry_price - 0.5 * setup.risk_distance
     else:
-        trigger = setup.entry_price - half_tp_dist
+        trigger = setup.entry_price - trigger_dist
         if params.sl_move_on_half_tp == "breakeven":
             moved = setup.entry_price
         else:
@@ -84,10 +85,11 @@ def _simulate_exit(df: pd.DataFrame, setup, params: Params) -> tuple[float, pd.T
     """Walk forward candle-by-candle from entry, checking SL/TP touches, then timeout.
 
     When `params.sl_move_on_half_tp` is set, the stop is moved once price
-    reaches 50% of the TP distance. The moved stop only takes effect from the
-    NEXT bar after the trigger bar (conservative: a single bar that touches
-    both the trigger and the old stop resolves to the old stop, consistent
-    with the same-bar SL/TP convention).
+    reaches `sl_move_trigger_pct` (default 50%) of the TP distance. The moved
+    stop only takes effect from the NEXT bar after the trigger bar
+    (conservative: a single bar that touches both the trigger and the old
+    stop resolves to the old stop, consistent with the same-bar SL/TP
+    convention).
     """
     deadline = setup.entry_time + timedelta(hours=params.session_max_hours)
     future = df.loc[
