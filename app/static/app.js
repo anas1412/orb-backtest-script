@@ -228,6 +228,7 @@
     lastResult = null;
     lastSim = null;
     calendarMonth = null;
+    yearNav = null;
     $("btnGenerate").disabled = true;
     $("btnClear").disabled = true;
     $("datasetMeta").innerHTML = "No dataset loaded";
@@ -367,6 +368,7 @@
   }
 
   let calendarMonth = null;
+  let yearNav = null;
 
   function calCellValue(v, usd){
     if (usd){
@@ -518,8 +520,13 @@
   }
 
   function renderMonthBreakdown(trades, pnl){
+    const list = $("monthBreakdown");
+    const label = $("yearLabel");
+    const next = $("yearNext");
     if (!trades || trades.length === 0){
-      $("monthBreakdown").innerHTML = `<div class="breakdown-row"><span class="label">No trades</span></div>`;
+      list.innerHTML = `<div class="breakdown-row"><span class="label">No trades</span></div>`;
+      label.textContent = "";
+      next.disabled = true;
       return;
     }
     const byMonth = {};
@@ -531,18 +538,25 @@
       v.usd += pnl ? (pnl[i] || 0) : 0;
       byMonth[key] = v;
     });
-    const rows = Object.keys(byMonth).sort().map(k => {
+    const lastYear = +trades[trades.length - 1].date.slice(0, 4);
+    if (!yearNav || yearNav > lastYear) yearNav = lastYear;
+    const yearKeys = Object.keys(byMonth).filter(k => k.startsWith(String(yearNav) + "-")).sort();
+    const rows = yearKeys.map(k => {
       const v = byMonth[k];
       const rClass = v.r > 0 ? "pos" : (v.r < 0 ? "neg" : "");
-      const label = new Date(k + "-01T00:00:00Z")
-        .toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+      const labelText = new Date(k + "-01T00:00:00Z")
+        .toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
       const usd = pnl ? ` · ${fmtUsdSigned(v.usd)}` : "";
       return `<div class="breakdown-row">
-        <span class="label">${label}</span>
+        <span class="label">${labelText}</span>
         <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R${usd}</span>
       </div>`;
     });
-    $("monthBreakdown").innerHTML = rows.join("");
+    list.innerHTML = rows.length
+      ? rows.join("")
+      : `<div class="breakdown-row"><span class="label">No trades</span></div>`;
+    label.textContent = String(yearNav);
+    next.disabled = yearNav >= lastYear;
   }
 
   const MONTH_ORDER = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -759,6 +773,7 @@
       currentJobId = data.job_id;
       lastResult = data;
       calendarMonth = null;
+      yearNav = null;
 
       $("emptyState").style.display = "none";
       $("resultsSection").style.display = "flex";
@@ -819,6 +834,17 @@
     if (!calendarMonth) return;
     calendarMonth = new Date(Date.UTC(calendarMonth.getUTCFullYear(), calendarMonth.getUTCMonth() + 1, 1));
     renderCalendar(lastResult ? lastResult.trades : null, lastSim ? lastSim.pnl : null);
+  });
+
+  $("yearPrev").addEventListener("click", () => {
+    if (!yearNav) return;
+    yearNav--;
+    renderMonthBreakdown(lastResult ? lastResult.trades : null, lastSim ? lastSim.pnl : null);
+  });
+  $("yearNext").addEventListener("click", () => {
+    if (!yearNav) return;
+    yearNav++;
+    renderMonthBreakdown(lastResult ? lastResult.trades : null, lastSim ? lastSim.pnl : null);
   });
 
   // Stop ladder editor
