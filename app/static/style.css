@@ -382,6 +382,18 @@ body{
   color: var(--text-faint);
   word-break: break-word;
 }
+.dataset-meta .meta-file-list{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
+}
+.dataset-meta .meta-file{
+  color: var(--text-dim);
+  font-size: 10px;
+}
 
 /* ---------- Two column ---------- */
 .two-col{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; }

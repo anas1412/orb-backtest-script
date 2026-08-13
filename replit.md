@@ -14,7 +14,7 @@ Open the webview at port 5000. No environment variables or API keys are required
 
 ## Usage
 
-1. **Upload real data** — upload a CSV with columns `timestamp, open, high, low, close`. Set the "Raw timestamp TZ" field to the source timezone if timestamps are not already UTC.
+1. **Upload real data** — upload one or more CSV files with columns `timestamp, open, high, low, close` (mixed formats are fine — each file is parsed independently then merged). Set the "Raw timestamp TZ" field to the source timezone if timestamps are not already UTC.
 3. **Configure strategy** — adjust session open time, range minutes, entry mode (market/limit), SL/TP, spread/slippage.
 4. **Run backtest** — results stream in real time; stats, equity curve, and trade-log export are shown on completion.
 

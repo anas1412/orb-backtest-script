@@ -48,11 +48,16 @@ python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ## Data
 
-- Upload a CSV with columns `timestamp, open, high, low, close`
+- Upload one or more M1 CSV files with columns `timestamp, open, high, low, close`
   (case-insensitive; common aliases like `date`/`time`/`o`/`h`/`l`/`c` are
-  also recognized). If the file's raw timestamps are not already UTC, set
+  also recognized). If a file's raw timestamps are not already UTC, set
   the "Raw timestamp TZ" field to the correct source timezone (e.g. `EET`,
   `America/New_York`) before uploading — the loader will not guess this.
+- Multiple files may be mixed formats (standard columns, MetaTrader-style
+  headerless exports, split date/time columns). Each file is parsed
+  individually, normalized to UTC, then merged into one dataset; bars with
+  duplicate timestamps keep the first file's copy. One report is generated
+  over the whole merged dataset.
 
 Free M1 gold data sources to try: HistData.com, Dukascopy, MetaTrader 5's
 History Center, or a Kaggle-hosted historical gold dataset. Verify each
@@ -60,7 +65,7 @@ source's raw timestamp timezone before uploading.
 
 ## API
 
-- `POST /api/data/upload` — upload a real M1 CSV
+- `POST /api/data/upload` — upload one or more M1 CSVs (`files` multipart field, repeated for multiple files)
 - `GET /api/data/status/{dataset_id}` — check a loaded dataset
 - `POST /api/backtest/run` — run a backtest with a given parameter set
 - `GET /api/backtest/export/{job_id}` — download the trade log as CSV

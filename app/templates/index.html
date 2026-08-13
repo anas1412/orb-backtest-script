@@ -44,8 +44,8 @@
         <section class="group">
           <h3 class="group-title">Data</h3>
           <label class="field">
-            <span><i data-lucide="file-up"></i>Upload M1 CSV</span>
-            <input type="file" id="fileUpload" accept=".csv">
+            <span><i data-lucide="file-up"></i>Upload M1 CSVs (one or more)</span>
+            <input type="file" id="fileUpload" accept=".csv" multiple>
           </label>
           <div class="progress" id="uploadProgressWrap" hidden>
             <div class="progress-track"><div class="progress-bar" id="uploadProgressBar"></div></div>
@@ -74,7 +74,7 @@
               </select>
             </label>
           </div>
-          <p class="hint">Leave <code>auto</code> to infer the timezone from weekend gaps (gold closes ~21:00 UTC Fri, reopens ~22:00 UTC Sun). If detection fails, set the source's raw timezone (e.g. <code>EET</code>) — the loader will not silently guess. Backtests run over the entire loaded dataset.</p>
+          <p class="hint">Select one or more M1 CSV files. Each file can be a different format or source (standard <code>timestamp,open,high,low,close</code>, MetaTrader headerless exports, split date/time columns) — every file is parsed individually, converted to UTC, then merged into a single dataset. Overlapping bars keep the first file's copy. Leave <code>auto</code> to infer the timezone from weekend gaps (gold closes ~21:00 UTC Fri, reopens ~22:00 UTC Sun). If detection fails, set the source's raw timezone (e.g. <code>EET</code>) — the loader will not silently guess. Backtests run over the entire merged dataset.</p>
           <div class="dataset-meta" id="datasetMeta">No dataset loaded</div>
         </section>
       </div>

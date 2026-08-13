@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 import io
 
 from app.engine.data_loader import (
-    load_ohlcv_csv, DataValidationError, LoadedData
+    load_ohlcv_csv, merge_loaded, DataValidationError, LoadedData
 )
 from app.engine.strategy import Params
 from app.engine.backtester import run_backtest, BacktestResult
@@ -85,27 +85,43 @@ async def index(request: Request):
 
 @app.post("/api/data/upload")
 async def upload_data(
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
     symbol: str = Form("XAUUSD"),
     source_tz: str = Form("auto"),
 ):
-    try:
-        content = await file.read()
-        loaded = load_ohlcv_csv(content, symbol=symbol, source_tz=source_tz, source_name=file.filename)
-    except DataValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded.")
 
+    loaded_list: list[LoadedData] = []
+    file_reports = []
+    for f in files:
+        try:
+            content = await f.read()
+            loaded = load_ohlcv_csv(content, symbol=symbol, source_tz=source_tz, source_name=f.filename)
+        except DataValidationError as e:
+            raise HTTPException(status_code=400, detail=f"{f.filename}: {e}")
+        loaded_list.append(loaded)
+        file_reports.append({
+            "source": loaded.source,
+            "rows": len(loaded.df),
+            "start": loaded.df["timestamp"].min().isoformat(),
+            "end": loaded.df["timestamp"].max().isoformat(),
+            "tz_note": loaded.tz_note,
+        })
+
+    combined = merge_loaded(loaded_list)
     dataset_id = str(uuid.uuid4())
-    DATA_STORE[dataset_id] = loaded
+    DATA_STORE[dataset_id] = combined
 
     return {
         "dataset_id": dataset_id,
-        "symbol": loaded.symbol,
-        "source": loaded.source,
-        "tz_note": loaded.tz_note,
-        "rows": len(loaded.df),
-        "start": loaded.df["timestamp"].min().isoformat(),
-        "end": loaded.df["timestamp"].max().isoformat(),
+        "symbol": combined.symbol,
+        "source": combined.source,
+        "tz_note": combined.tz_note,
+        "files": file_reports,
+        "rows": len(combined.df),
+        "start": combined.df["timestamp"].min().isoformat(),
+        "end": combined.df["timestamp"].max().isoformat(),
     }
 
 

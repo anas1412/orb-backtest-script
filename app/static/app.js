@@ -61,13 +61,21 @@
   function showDatasetMeta(data){
     const range = `${(data.start||"").slice(0,10)} → ${(data.end||"").slice(0,10)}`;
     const el = $("datasetMeta");
-    if (el){ el.textContent = `${data.symbol} · ${data.rows.toLocaleString()} bars · ${range} UTC`; }
+    const nFiles = (data.files || []).length;
+    const perFile = (data.files || []).map(f =>
+      `<span class="meta-file">${f.source} — ${f.rows.toLocaleString()} bars</span>`).join("");
+    if (el){
+      el.innerHTML =
+        `${data.symbol} · ${nFiles} file${nFiles === 1 ? "" : "s"} · ` +
+        `${data.rows.toLocaleString()} bars · ${range} UTC` +
+        (perFile ? `<span class="meta-file-list">${perFile}</span>` : "");
+    }
     setStatus(`${data.symbol} · ${data.rows.toLocaleString()} bars · ${range}`, true);
   }
 
   async function handleUpload(e){
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
     const wrap = $("uploadProgressWrap");
     const bar = $("uploadProgressBar");
@@ -78,7 +86,7 @@
 
     try{
       const form = new FormData();
-      form.append("file", file);
+      files.forEach(f => form.append("files", f));
       form.append("symbol", $("uploadSymbol").value || "XAUUSD");
       form.append("source_tz", $("uploadTz").value || "auto");
 

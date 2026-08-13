@@ -85,6 +85,31 @@ class LoadedData:
     tz_note: str              # human-readable note on how timezone was resolved
 
 
+def merge_loaded(loaded_list: list[LoadedData]) -> LoadedData:
+    """
+    Combine several already-loaded datasets into one.
+
+    Each input is already normalized to UTC with a sorted, de-duplicated
+    index. The merged frame is re-sorted by timestamp and duplicate
+    timestamps are dropped keeping the FIRST occurrence, so when files
+    overlap in time the earlier file in the list wins. A human-readable
+    source label and tz note are joined from all inputs.
+    """
+    if not loaded_list:
+        raise DataValidationError("No files were loaded.")
+    df = pd.concat([l.df for l in loaded_list], ignore_index=True)
+    df = df.sort_values("timestamp")
+    df = df.drop_duplicates(subset="timestamp", keep="first").reset_index(drop=True)
+    if len(df) == 0:
+        raise DataValidationError("No valid bars after merging files.")
+    return LoadedData(
+        df=df,
+        symbol=loaded_list[0].symbol,
+        source=" + ".join(l.source for l in loaded_list),
+        tz_note=" | ".join(l.tz_note for l in loaded_list),
+    )
+
+
 def _standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Map common column-name variants (from different free data sources) to our schema."""
     lower_cols = {c.lower().strip(): c for c in df.columns}
