@@ -13,7 +13,6 @@ import io
 from dataclasses import dataclass
 from datetime import timedelta, timezone
 
-import numpy as np
 import pandas as pd
 
 REQUIRED_COLUMNS = ["timestamp", "open", "high", "low", "close"]
@@ -270,59 +269,3 @@ def load_ohlcv_csv(
         raise DataValidationError("No valid rows after parsing/cleaning.")
 
     return LoadedData(df=out, symbol=symbol, source=source_name, tz_note=tz_note)
-
-
-def generate_synthetic_gold_m1(
-    start_date: str,
-    end_date: str,
-    seed: int = 42,
-    base_price: float = 2000.0,
-) -> LoadedData:
-    """
-    Generate synthetic M1 OHLCV data resembling gold price action, for
-    testing the engine end-to-end when no real data source is connected.
-
-    This is NOT real market data and must never be presented as such --
-    it exists purely to validate that the mechanics of the backtester
-    (range detection, breakout logic, fills, SL/TP, stats) work correctly.
-    """
-    rng = np.random.default_rng(seed)
-
-    idx = pd.date_range(start=start_date, end=end_date, freq="min", tz="UTC")
-    # Skip weekends here too, just so synthetic data is realistic; the engine
-    # would skip them anyway.
-    idx = idx[idx.dayofweek < 5]
-
-    n = len(idx)
-    # Random walk with tiny drift, small per-minute volatility, occasional
-    # volatility bursts around session opens (00:00 UTC) to create breakout
-    # scenarios worth testing.
-    minute_of_day = idx.hour * 60 + idx.minute
-    vol_burst = np.where((minute_of_day >= 0) & (minute_of_day < 60), 1.8, 1.0)
-
-    step_std = 0.35 * vol_burst
-    steps = rng.normal(loc=0.0, scale=step_std, size=n)
-    close = base_price + np.cumsum(steps)
-
-    open_ = np.empty(n)
-    open_[0] = base_price
-    open_[1:] = close[:-1]
-
-    intrabar_range = np.abs(rng.normal(loc=0.4, scale=0.25, size=n)) * vol_burst
-    high = np.maximum(open_, close) + intrabar_range * rng.uniform(0.2, 1.0, size=n)
-    low = np.minimum(open_, close) - intrabar_range * rng.uniform(0.2, 1.0, size=n)
-
-    df = pd.DataFrame({
-        "timestamp": idx,
-        "open": open_,
-        "high": high,
-        "low": low,
-        "close": close,
-    })
-
-    return LoadedData(
-        df=df,
-        symbol="XAUUSD (SYNTHETIC)",
-        source="synthetic_generator",
-        tz_note="Synthetic data generated directly in UTC; no conversion needed.",
-    )

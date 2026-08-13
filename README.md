@@ -23,7 +23,7 @@ project plan (`plan.md`, if included alongside this app).
 ```
 app/
   engine/
-    data_loader.py   # CSV loading + UTC timezone normalization, synthetic data generator
+    data_loader.py   # CSV loading + UTC timezone normalization
     session.py        # opening-range window computation, trading-day iteration
     strategy.py        # breakout detection, entry modes, SL/TP calculation
     backtester.py      # main day-by-day simulation loop
@@ -57,12 +57,7 @@ python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ## Data
 
-- **Test data**: click "Generate test data" in the UI to create synthetic
-  M1 OHLC data for a date range. This is **not real market data** — it
-  exists only to exercise the engine's mechanics (range detection, breakout
-  logic, fills, SL/TP, stats) end-to-end. Do not draw trading conclusions
-  from results on synthetic data.
-- **Real data**: upload a CSV with columns `timestamp, open, high, low, close`
+- Upload a CSV with columns `timestamp, open, high, low, close`
   (case-insensitive; common aliases like `date`/`time`/`o`/`h`/`l`/`c` are
   also recognized). If the file's raw timestamps are not already UTC, set
   the "Raw timestamp TZ" field to the correct source timezone (e.g. `EET`,
@@ -74,7 +69,6 @@ source's raw timestamp timezone before uploading.
 
 ## API
 
-- `POST /api/data/synthetic` — generate synthetic test data
 - `POST /api/data/upload` — upload a real M1 CSV
 - `GET /api/data/status/{dataset_id}` — check a loaded dataset
 - `POST /api/backtest/run` — run a backtest with a given parameter set

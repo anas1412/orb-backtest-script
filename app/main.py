@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 import io
 
 from app.engine.data_loader import (
-    load_ohlcv_csv, generate_synthetic_gold_m1, DataValidationError, LoadedData
+    load_ohlcv_csv, DataValidationError, LoadedData
 )
 from app.engine.strategy import Params
 from app.engine.backtester import run_backtest, BacktestResult
@@ -108,36 +108,6 @@ async def upload_data(
     }
 
 
-@app.post("/api/data/synthetic")
-async def load_synthetic(
-    start_date: str = Form(...),
-    end_date: str = Form(...),
-    seed: int = Form(42),
-):
-    try:
-        loaded = generate_synthetic_gold_m1(
-            _normalize_date(start_date, "Start date"),
-            _normalize_date(end_date, "End date"),
-            seed=seed,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    dataset_id = str(uuid.uuid4())
-    DATA_STORE[dataset_id] = loaded
-
-    return {
-        "dataset_id": dataset_id,
-        "symbol": loaded.symbol,
-        "source": loaded.source,
-        "tz_note": loaded.tz_note,
-        "rows": len(loaded.df),
-        "start": loaded.df["timestamp"].min().isoformat(),
-        "end": loaded.df["timestamp"].max().isoformat(),
-        "is_synthetic": True,
-    }
-
-
 @app.get("/api/data/status/{dataset_id}")
 async def data_status(dataset_id: str):
     loaded = DATA_STORE.get(dataset_id)
@@ -158,7 +128,7 @@ async def data_status(dataset_id: str):
 async def run_backtest_endpoint(p: BacktestParams):
     loaded = DATA_STORE.get(p.dataset_id)
     if loaded is None:
-        raise HTTPException(status_code=404, detail="Dataset not found. Upload or generate data first.")
+        raise HTTPException(status_code=404, detail="Dataset not found. Upload data first.")
 
     # Optional date window (DD/MM/YYYY or YYYY-MM-DD, inclusive days, UTC).
     df = loaded.df
