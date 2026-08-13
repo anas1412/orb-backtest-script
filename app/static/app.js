@@ -928,12 +928,12 @@
   $("yearPrev").addEventListener("click", () => {
     if (!yearNav) return;
     yearNav--;
-    renderMonthBreakdown(lastResult ? lastResult.trades : null, lastSim ? lastSim.pnl : null);
+    renderMonthBreakdown(lastResult ? lastResult.trades : null);
   });
   $("yearNext").addEventListener("click", () => {
     if (!yearNav) return;
     yearNav++;
-    renderMonthBreakdown(lastResult ? lastResult.trades : null, lastSim ? lastSim.pnl : null);
+    renderMonthBreakdown(lastResult ? lastResult.trades : null);
   });
 
   // Stop ladder editor
