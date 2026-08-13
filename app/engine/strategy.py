@@ -43,7 +43,7 @@ class Params:
     # trigger_R, the SL moves to sl_R_from_entry (negative = still below entry,
     # 0.0 = breakeven, positive = locked profit). Steps apply in order, each
     # move takes effect from the next candle on. Empty tuple = no moves.
-    sl_ladder: tuple[tuple[float, float], ...] = ((1.0, -0.5),)
+    sl_ladder: tuple[tuple[float, float], ...] = ((0.5, -0.5),)
     pip_size: float = 0.01  # gold: 1 pip = $0.01 by common retail convention
 
 

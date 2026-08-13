@@ -95,7 +95,7 @@ with cumulative R overlaid on the right axis.
   `1.0` lands exactly on the boundary opposite the breakout side.
 - `tp_rr = 1.0` produces exactly ±1.0 R outcomes on TP/SL hits (before
   execution costs).
-- `sl_ladder` (default `[[1.0, -0.5]]`) moves the
+- `sl_ladder` (default `[[0.5, -0.5]]`) moves the
   stop step by step as price advances. Each step is `[trigger_R, sl_R]`: when
   price reaches `trigger_R` (R = risk distance from entry), the stop moves to
   `sl_R` (negative = below entry, 0 = breakeven, positive = locked profit).

@@ -966,7 +966,7 @@
     updateSummary();
   });
 
-  [[1.0, -0.5]].forEach(([trigger, sl]) => addLadderRow(trigger, sl));
+  [[0.5, -0.5]].forEach(([trigger, sl]) => addLadderRow(trigger, sl));
   syncLadderEmpty();
 
   // Capital simulation: recompute (and re-render) on any change, debounced.

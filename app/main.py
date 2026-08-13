@@ -71,7 +71,7 @@ class BacktestParams(BaseModel):
     entry_mode: str = "market"
     sl_pct_of_range: float = Field(0.5, ge=0.0, le=5.0)
     tp_rr: float = Field(2.0, gt=0.0)
-    sl_ladder: list[list[float]] = Field(default_factory=lambda: [[1.0, -0.5]])
+    sl_ladder: list[list[float]] = Field(default_factory=lambda: [[0.5, -0.5]])
     spread_pips: float = Field(0.0, ge=0.0)
     slippage_pips: float = Field(0.0, ge=0.0)
     session_max_hours: float = Field(20.0, gt=0.0)
