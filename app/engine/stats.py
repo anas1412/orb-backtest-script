@@ -122,6 +122,8 @@ def trades_to_dataframe(result: BacktestResult) -> pd.DataFrame:
             "entry_time_utc": t.entry_time.isoformat(),
             "sl_price": round(t.sl_price, 4),
             "tp_price": round(t.tp_price, 4),
+            "sl_moved": t.sl_moved,
+            "sl_final": round(t.sl_final, 4) if t.sl_moved else None,
             "exit_price": round(t.exit_price, 4),
             "exit_time_utc": t.exit_time.isoformat(),
             "exit_reason": t.exit_reason,

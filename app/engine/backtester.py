@@ -32,6 +32,8 @@ class Trade:
     sl_price: float
     tp_price: float
     risk_distance: float
+    sl_moved: bool
+    sl_final: float
     exit_price: float
     exit_time: pd.Timestamp
     exit_reason: ExitReason
@@ -51,44 +53,95 @@ class BacktestResult:
     params: Params | None = None
 
 
-def _simulate_exit(df: pd.DataFrame, setup, params: Params) -> tuple[float, pd.Timestamp, ExitReason]:
-    """Walk forward candle-by-candle from entry, checking SL/TP touches, then timeout."""
+def _half_tp_levels(setup, params: Params) -> tuple[float | None, float | None]:
+    """
+    Stop-management levels for the half-TP rule.
+
+    Returns (trigger_price, moved_sl_price), or (None, None) when the rule is
+    disabled. The trigger is the price that means the trade has banked 50% of
+    the distance to TP: entry +- 0.5 * tp_rr * risk_distance.
+    """
+    if params.sl_move_on_half_tp == "none":
+        return None, None
+
+    half_tp_dist = 0.5 * params.tp_rr * setup.risk_distance
+    if setup.direction == "long":
+        trigger = setup.entry_price + half_tp_dist
+        if params.sl_move_on_half_tp == "breakeven":
+            moved = setup.entry_price
+        else:  # half_risk: half the original risk distance away from entry
+            moved = setup.entry_price - 0.5 * setup.risk_distance
+    else:
+        trigger = setup.entry_price - half_tp_dist
+        if params.sl_move_on_half_tp == "breakeven":
+            moved = setup.entry_price
+        else:
+            moved = setup.entry_price + 0.5 * setup.risk_distance
+    return trigger, moved
+
+
+def _simulate_exit(df: pd.DataFrame, setup, params: Params) -> tuple[float, pd.Timestamp, ExitReason, bool, float]:
+    """Walk forward candle-by-candle from entry, checking SL/TP touches, then timeout.
+
+    When `params.sl_move_on_half_tp` is set, the stop is moved once price
+    reaches 50% of the TP distance. The moved stop only takes effect from the
+    NEXT bar after the trigger bar (conservative: a single bar that touches
+    both the trigger and the old stop resolves to the old stop, consistent
+    with the same-bar SL/TP convention).
+    """
     deadline = setup.entry_time + timedelta(hours=params.session_max_hours)
     future = df.loc[
         (df["timestamp"] > setup.entry_time) & (df["timestamp"] <= deadline)
     ].sort_values("timestamp")
 
+    trigger, moved_sl = _half_tp_levels(setup, params)
+    current_sl = setup.sl_price
+    sl_moved = False
+
     for _, bar in future.iterrows():
         hi, lo = float(bar["high"]), float(bar["low"])
+
+        # Evaluate THIS bar against the stop that was in force at its open.
+        # A bar that also touches the trigger is checked against the OLD stop:
+        # without tick data, hitting the trigger first and then the old stop is
+        # ambiguous, so assume the worse outcome (consistent with the
+        # same-bar SL/TP convention).
         if setup.direction == "long":
-            hit_sl = lo <= setup.sl_price
+            hit_sl = lo <= current_sl
             hit_tp = hi >= setup.tp_price
         else:
-            hit_sl = hi >= setup.sl_price
+            hit_sl = hi >= current_sl
             hit_tp = lo <= setup.tp_price
 
         # If both SL and TP could be touched in the same candle, assume the
         # worse outcome for the trader (SL first) -- a conservative, standard
         # backtesting convention absent tick-level data.
         if hit_sl and hit_tp:
-            exit_price = _apply_costs(setup.sl_price, setup.direction, is_entry=False, params=params)
-            return exit_price, bar["timestamp"], "sl"
+            exit_price = _apply_costs(current_sl, setup.direction, is_entry=False, params=params)
+            return exit_price, bar["timestamp"], "sl", sl_moved, current_sl
         if hit_sl:
-            exit_price = _apply_costs(setup.sl_price, setup.direction, is_entry=False, params=params)
-            return exit_price, bar["timestamp"], "sl"
+            exit_price = _apply_costs(current_sl, setup.direction, is_entry=False, params=params)
+            return exit_price, bar["timestamp"], "sl", sl_moved, current_sl
         if hit_tp:
             exit_price = _apply_costs(setup.tp_price, setup.direction, is_entry=False, params=params)
-            return exit_price, bar["timestamp"], "tp"
+            return exit_price, bar["timestamp"], "tp", sl_moved, current_sl
+
+        # Stop-management: the moved stop only takes effect from the NEXT bar.
+        if not sl_moved and trigger is not None:
+            touched = hi >= trigger if setup.direction == "long" else lo <= trigger
+            if touched:
+                sl_moved = True
+                current_sl = moved_sl
 
     # Timeout: force-close at the last available price at/after the deadline,
     # or the last bar in the dataset if we ran out of data first.
     if len(future) > 0:
         last_bar = future.iloc[-1]
         exit_price = _apply_costs(float(last_bar["close"]), setup.direction, is_entry=False, params=params)
-        return exit_price, last_bar["timestamp"], "timeout"
+        return exit_price, last_bar["timestamp"], "timeout", sl_moved, current_sl
 
     # No future bars at all (end of dataset right at entry) -- exit at entry price, 0R.
-    return setup.entry_price, setup.entry_time, "timeout"
+    return setup.entry_price, setup.entry_time, "timeout", sl_moved, current_sl
 
 
 def run_backtest(
@@ -130,7 +183,7 @@ def run_backtest(
             result.no_trade_days.append(NoTradeDay(day, "no_fill"))
             continue
 
-        exit_price, exit_time, exit_reason = _simulate_exit(df, setup, params)
+        exit_price, exit_time, exit_reason, sl_moved, sl_final = _simulate_exit(df, setup, params)
 
         pnl_price = (
             exit_price - setup.entry_price
@@ -154,6 +207,8 @@ def run_backtest(
             sl_price=setup.sl_price,
             tp_price=setup.tp_price,
             risk_distance=setup.risk_distance,
+            sl_moved=sl_moved,
+            sl_final=sl_final,
             exit_price=exit_price,
             exit_time=exit_time,
             exit_reason=exit_reason,
