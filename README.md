@@ -106,7 +106,7 @@ with cumulative R overlaid on the right axis.
   and the old stop counts as the old stop (conservative), and a bar racing
   across several triggers applies the highest reached step. Empty = no moves.
 - Limit-mode entries fill exactly at the broken range boundary.
-- Trades left open are force-closed at `session_max_hours` (default 20h)
+- Trades left open are force-closed at `session_max_hours` (default 1h)
   with `exit_reason = "timeout"`.
 - Malformed OHLC rows (e.g. high below open/close) are rejected on upload
   with a clear error rather than silently accepted.

@@ -29,13 +29,13 @@ EntryMode = Literal["market", "limit"]
 class Params:
     session_open_utc: str = "00:00"
     range_minutes: int = 15
-    breakout_search_minutes: int = 44
+    breakout_search_minutes: int = 14
     entry_mode: EntryMode = "market"
     sl_pct_of_range: float = 0.5
     tp_rr: float = 2.0
     spread_pips: float = 0.0
     slippage_pips: float = 0.0
-    session_max_hours: float = 20.0
+    session_max_hours: float = 1.0
     # ISO weekdays (Mon=0 ... Fri=4) on which trades are taken; Sat/Sun excluded.
     trading_days: tuple[int, ...] = (0, 1, 2, 3, 4)
     # Stop-management: a ladder of (trigger_R, sl_R_from_entry) steps. R is the

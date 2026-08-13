@@ -1083,6 +1083,7 @@
     scheduleSim();
     $("capitalControls").classList.toggle("disabled", !$("capitalEnabled").checked);
   });
+  $("capitalControls").classList.toggle("disabled", !$("capitalEnabled").checked);
   $("capitalInitial").addEventListener("input", scheduleSim);
   $("capitalRiskPct").addEventListener("input", scheduleSim);
   $("capitalMode").addEventListener("change", scheduleSim);
