@@ -18,8 +18,12 @@ def main() -> None:
     print("Installing dependencies...")
     subprocess.run([str(VENV_PY), "-m", "pip", "install", "--no-cache-dir", "-r", str(ROOT / "requirements.txt")], check=True)
 
-    print("Starting server at http://localhost:8000  (Ctrl+C to stop)")
-    subprocess.run([str(VENV_PY), "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"], cwd=ROOT)
+    port = os.environ.get("PORT", "8000")
+    print(f"Starting server at http://localhost:{port}  (Ctrl+C to stop)")
+    subprocess.run(
+        [str(VENV_PY), "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", port],
+        cwd=ROOT,
+    )
 
 
 if __name__ == "__main__":

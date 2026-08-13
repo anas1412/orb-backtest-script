@@ -65,13 +65,13 @@ class BacktestParams(BaseModel):
     dataset_id: str
     session_open_utc: str = "00:00"
     range_minutes: int = Field(15, ge=1, le=240)
-    breakout_search_minutes: int = Field(60, ge=1, le=480)
+    breakout_search_minutes: int = Field(180, ge=1, le=480)
     entry_mode: str = "market"
     sl_pct_of_range: float = Field(0.5, ge=0.0, le=5.0)
     tp_rr: float = Field(1.0, gt=0.0)
     spread_pips: float = Field(0.0, ge=0.0)
     slippage_pips: float = Field(0.0, ge=0.0)
-    session_max_hours: float = Field(8.0, gt=0.0)
+    session_max_hours: float = Field(20.0, gt=0.0)
     skip_weekends: bool = True
     start_date: Optional[str] = None
     end_date: Optional[str] = None

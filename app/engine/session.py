@@ -44,7 +44,7 @@ def compute_session_range(
     day: pd.Timestamp,
     session_open_utc: str = "00:00",
     range_minutes: int = 15,
-    breakout_search_minutes: int = 60,
+    breakout_search_minutes: int = 180,
 ) -> SessionRange:
     """
     For a given UTC calendar day, compute the opening-range high/low from

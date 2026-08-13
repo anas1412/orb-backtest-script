@@ -79,7 +79,7 @@ source's raw timestamp timezone before uploading.
 - `tp_rr = 1.0` produces exactly ±1.0 R outcomes on TP/SL hits (before
   execution costs).
 - Limit-mode entries fill exactly at the broken range boundary.
-- Trades left open are force-closed at `session_max_hours` (default 8h)
+- Trades left open are force-closed at `session_max_hours` (default 20h)
   with `exit_reason = "timeout"`.
 - Malformed OHLC rows (e.g. high below open/close) are rejected on upload
   with a clear error rather than silently accepted.

@@ -29,13 +29,13 @@ EntryMode = Literal["market", "limit"]
 class Params:
     session_open_utc: str = "00:00"
     range_minutes: int = 15
-    breakout_search_minutes: int = 60
+    breakout_search_minutes: int = 180
     entry_mode: EntryMode = "market"
     sl_pct_of_range: float = 0.5
     tp_rr: float = 1.0
     spread_pips: float = 0.0
     slippage_pips: float = 0.0
-    session_max_hours: float = 8.0
+    session_max_hours: float = 20.0
     skip_weekends: bool = True
     pip_size: float = 0.01  # gold: 1 pip = $0.01 by common retail convention
 

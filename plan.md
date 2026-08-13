@@ -56,7 +56,7 @@ Two configurable modes (parameter: `entry_mode`):
 ### Step 6 — Trade management
 - One trade per day maximum (only the first valid breakout is traded).
 - Trade exits on whichever of SL/TP is hit first, checked candle-by-candle going forward from entry.
-- If neither SL nor TP is hit within `session_max_hours` (default 8 hours) from entry, the trade is force-closed at the last available price at that cutoff, or at end of dataset if that comes first.
+- If neither SL nor TP is hit within `session_max_hours` (default 20 hours) from entry, the trade is force-closed at the last available price at that cutoff, or at end of dataset if that comes first.
 
 ---
 
@@ -130,14 +130,14 @@ A single-page dashboard UI:
 | `timeframe` | M1 | |
 | `session_open_utc` | 00:00 | Asia/Tokyo session open convention |
 | `range_minutes` | 15 | opening range duration |
-| `breakout_search_minutes` | 60 | stop looking 1h after session open; also governs limit-order expiry |
+| `breakout_search_minutes` | 180 | stop looking 3h after session open; also governs limit-order expiry |
 | `entry_mode` | `market` | or `limit` |
 | `sl_anchor` | range midpoint | fixed rule, not a parameter |
 | `sl_pct_of_range` | 0.5 | fraction of range size from midpoint; 0.5 = midpoint itself, adjustable |
 | `tp_rr` | 1.0 | risk:reward multiple, any positive number |
 | `spread_pips` | 0 | execution cost, off by default |
 | `slippage_pips` | 0 | execution cost, off by default |
-| `session_max_hours` | 8 | force-close open trades after this many hours from entry |
+| `session_max_hours` | 20 | force-close open trades after this many hours from entry |
 | `skip_weekends` | true | Saturday & Sunday excluded entirely |
 
 Note: with a single session (one opening range, one breakout search window per day), at most one trade per day is possible structurally — there is only ever one setup to take, so no "max trades per day" parameter exists in this version. Multiple trades per day would require multiple sessions (e.g. adding London/New York opens alongside Asia), deferred to a later phase.
