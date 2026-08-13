@@ -325,27 +325,16 @@
     renderAll();
   }
 
-  function dollarTotals(trades, pnl){
-    const out = { long: 0, short: 0, dow: {} };
-    (trades || []).forEach((t, i) => {
-      const p = pnl ? (pnl[i] || 0) : 0;
-      out[t.direction] += p;
-      const dow = new Date(t.date + "T00:00:00Z").toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
-      out.dow[dow] = (out.dow[dow] || 0) + p;
-    });
-    return out;
-  }
-
   function renderAll(){
     if (!lastResult) return;
     const sim = lastSim;
     const trades = sim ? lastResult.trades : null;
     renderStats(lastResult.stats, sim);
     renderCalendar(lastResult.trades, sim ? sim.pnl : null);
-    renderDowBreakdown(lastResult.breakdown_day_of_week, trades, sim ? sim.pnl : null);
+    renderDowBreakdown(lastResult.breakdown_day_of_week);
     renderMonthBreakdown(lastResult.trades, sim ? sim.pnl : null);
-    renderAvgMonthBreakdown(lastResult.trades, sim ? sim.pnl : null);
-    renderSlotBreakdown(lastResult.trades, sim ? sim.pnl : null);
+    renderAvgMonthBreakdown(lastResult.trades);
+    renderSlotBreakdown(lastResult.trades);
     renderTable(lastResult.trades, sim ? sim.pnl : null);
     renderEquityCurve(lastResult.equity_curve, sim ? sim.curve : null, sim ? readCapitalParams().initial_capital : null);
     const sub = document.querySelector(".chart-panel .panel-sub");
@@ -559,21 +548,19 @@
     grid.innerHTML = cells;
   }
 
-  function renderDowBreakdown(dow, trades, pnl){
+  function renderDowBreakdown(dow){
     const order = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
     const keys = Object.keys(dow).sort((a,b) => order.indexOf(a) - order.indexOf(b));
     if (keys.length === 0){
       $("dowBreakdown").innerHTML = `<div class="breakdown-row"><span class="label">No trades</span></div>`;
       return;
     }
-    const dt = trades ? dollarTotals(trades, pnl) : null;
     const rows = keys.map(k => {
       const d = dow[k];
       const rClass = d.total_r > 0 ? "pos" : (d.total_r < 0 ? "neg" : "");
-      const usd = dt && dt.dow[k] ? ` · ${fmtUsdSigned(dt.dow[k])}` : "";
       return `<div class="breakdown-row">
         <span class="label">${k}</span>
-        <span class="value ${rClass}">${d.trades} trades · ${(d.total_r>0?'+':'')}${fmt(d.total_r)}R${usd}</span>
+        <span class="value ${rClass}">${d.trades} trades · ${(d.total_r>0?'+':'')}${fmt(d.total_r)}R · <span class="dim">${fmtPct(d.win_rate)} wr</span></span>
       </div>`;
     });
     $("dowBreakdown").innerHTML = rows.join("");
@@ -621,19 +608,19 @@
 
   const MONTH_ORDER = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-  function renderAvgMonthBreakdown(trades, pnl){
+  function renderAvgMonthBreakdown(trades){
     if (!trades || trades.length === 0){
       $("avgMonthBreakdown").innerHTML = `<div class="breakdown-row"><span class="label">No trades</span></div>`;
       return;
     }
     const byMonth = {};
-    trades.forEach((t, i) => {
+    trades.forEach(t => {
       const name = new Date(t.date + "T00:00:00Z")
         .toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
-      const v = byMonth[name] || { n: 0, r: 0, usd: 0 };
+      const v = byMonth[name] || { n: 0, r: 0, w: 0 };
       v.n++;
       v.r += t.r_multiple;
-      v.usd += pnl ? (pnl[i] || 0) : 0;
+      v.w += t.r_multiple > 0 ? 1 : 0;
       byMonth[name] = v;
     });
     const rows = MONTH_ORDER.filter(m => byMonth[m]).map(name => {
@@ -641,18 +628,15 @@
       const avgR = v.r / v.n;
       const rClass = v.r > 0 ? "pos" : (v.r < 0 ? "neg" : "");
       const avgCls = avgR > 0 ? "pos" : (avgR < 0 ? "neg" : "");
-      const usd = pnl
-        ? ` · <span class="dim">${fmtUsdSigned(v.usd)} · ${fmtUsdSigned(v.usd / v.n)} avg</span>`
-        : "";
       return `<div class="breakdown-row">
         <span class="label">${name}</span>
-        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)}R avg</span>${usd}</span>
+        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)}R avg</span> · <span class="dim">${fmtPct(v.w / v.n)} wr</span></span>
       </div>`;
     });
     $("avgMonthBreakdown").innerHTML = rows.join("");
   }
 
-  function renderSlotBreakdown(trades, pnl){
+  function renderSlotBreakdown(trades){
     const list = $("slotBreakdown");
     if (!trades || trades.length === 0){
       list.innerHTML = `<div class="breakdown-row"><span class="label">No trades</span></div>`;
@@ -660,17 +644,17 @@
     }
     const bySlot = {};
     let anyTime = false;
-    trades.forEach((t, i) => {
+    trades.forEach(t => {
       if (!t.entry_time_utc) return;
       const e = new Date(t.entry_time_utc);
       if (isNaN(e.getTime())) return;
       anyTime = true;
       const slot = String(e.getUTCHours()).padStart(2, "0") + ":" +
         String(Math.floor(e.getUTCMinutes() / 15) * 15).padStart(2, "0");
-      const v = bySlot[slot] || { n: 0, r: 0, usd: 0 };
+      const v = bySlot[slot] || { n: 0, r: 0, w: 0 };
       v.n++;
       v.r += t.r_multiple;
-      v.usd += pnl ? (pnl[i] || 0) : 0;
+      v.w += t.r_multiple > 0 ? 1 : 0;
       bySlot[slot] = v;
     });
     if (!anyTime){
@@ -682,12 +666,9 @@
       const avgR = v.r / v.n;
       const rClass = v.r > 0 ? "pos" : (v.r < 0 ? "neg" : "");
       const avgCls = avgR > 0 ? "pos" : (avgR < 0 ? "neg" : "");
-      const usd = pnl
-        ? ` · <span class="dim">${fmtUsdSigned(v.usd)} · ${fmtUsdSigned(v.usd / v.n)} avg</span>`
-        : "";
       return `<div class="breakdown-row">
         <span class="label">${slot}</span>
-        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)}R avg</span>${usd}</span>
+        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)}R avg</span> · <span class="dim">${fmtPct(v.w / v.n)} wr</span></span>
       </div>`;
     });
     list.innerHTML = rows.join("");
