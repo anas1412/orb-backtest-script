@@ -27,7 +27,7 @@ No installation needed. Open the hosted app, upload your M1 gold CSV, and run:
 **https://orb-backtest-script--anasbassoumi1.replit.app/**
 
 1. Open the link.
-2. Click **Try demo data** to load a bundled May–Aug 2026 gold M1 dataset and run a backtest instantly — no files needed. Or upload your own data.
+2. Click **Try demo data** to load the bundled gold M1 datasets (all available months) and run a backtest instantly — no files needed. Or upload your own data.
 3. Set "Raw timestamp TZ" to your CSV's source timezone (or leave `auto`).
 4. Adjust strategy params if you like, then click **Generate backtest**.
 

@@ -291,7 +291,7 @@
       showDatasetMeta(data);
       $("btnGenerate").disabled = false;
       $("btnClear").disabled = false;
-      await handleGenerate({ start_date: "2026-05-01", end_date: "2026-08-12" });
+      await handleGenerate();
     } catch(err){
       currentDatasetId = null;
       $("btnGenerate").disabled = true;
@@ -993,6 +993,18 @@
   $("btnClear").addEventListener("click", handleClear);
   $("btnDemo").addEventListener("click", handleDemo);
   $("btnExport").addEventListener("click", handleExport);
+
+  async function loadDemoLabel(){
+    const label = $("demoLabel");
+    if (!label) return;
+    try{
+      const res = await fetch("/api/data/demo");
+      if (!res.ok) return;
+      const meta = await res.json();
+      if (meta.coverage) label.textContent = "Try demo data (" + meta.coverage + ")";
+    } catch(e){ /* non-fatal: button keeps its default text */ }
+  }
+  loadDemoLabel();
 
   function syncAllDaysToggle(){
     const all = $("allDays").checked;

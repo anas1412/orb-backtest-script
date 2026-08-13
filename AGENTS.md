@@ -37,5 +37,5 @@ UI at `http://localhost:8000`. No test suite, no pytest, no lint/typecheck confi
 
 ## Verification
 
-- Engine smoke test (no server needed): load `datasets/XAUUSD_M1_2024-01-01_2025-12-06.csv` via `load_ohlcv_csv`, run backtest, compute stats — `load_ohlcv_csv(...)` -> `run_backtest(loaded.df, Params())` -> `compute_stats(result)`.
+- Engine smoke test (no server needed): load a bundled dataset, run backtest, compute stats — `load_ohlcv_csv(Path("datasets/DAT_MT_XAUUSD_M1_202607.csv").read_bytes(), symbol="XAUUSD", source_tz="auto")` -> `run_backtest(loaded.df, Params())` -> `compute_stats(result)`.
 - README's "Verified behavior" section lists invariants that must keep holding (SL 0.5 lands exactly on midpoint, tp_rr 1.0 gives +/-1.0 R, limit fills at boundary, timeout at `session_max_hours`).

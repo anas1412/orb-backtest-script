@@ -134,28 +134,62 @@ def _dataset_response(dataset_id: str, loaded: LoadedData) -> dict:
     }
 
 
-DEMO_DATASET_REL = "datasets/XAUUSD_M1_2026-05-01_2026-08-12.csv"
-DEMO_WINDOW = ("2026-05-01", "2026-08-12")
+DEMO_DATASET_GLOB = "datasets/DAT_MT_XAUUSD_M1_*.csv"
+
+
+def _demo_files() -> list[Path]:
+    return sorted(BASE_DIR.parent.glob(DEMO_DATASET_GLOB))
+
+
+def _demo_coverage_label() -> str | None:
+    """Human range of the bundled demo files from their names, e.g. 'Jan 2026 → Jul 2026'."""
+    months: list[tuple[int, int | None]] = []
+    for p in _demo_files():
+        m = re.search(r"M1_(\d{4})(\d{2})?\.csv$", p.name)
+        if not m:
+            continue
+        year = int(m.group(1))
+        month = int(m.group(2)) if m.group(2) else None
+        months.append((year, month))
+    if not months:
+        return None
+    names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    fmt = lambda y, mo: f"{names[mo]} {y}" if mo else f"{y}"
+    first, last = months[0], months[-1]
+    label = fmt(*first)
+    if last != first:
+        label += f" → {fmt(*last)}"
+    return label
+
+
+@app.get("/api/data/demo")
+async def demo_meta():
+    """Report the bundled demo dataset's coverage so the UI can label its button."""
+    return {"coverage": _demo_coverage_label()}
 
 
 @app.post("/api/data/demo")
 async def load_demo_data():
-    """Load the bundled demo dataset (May-Aug 2026 gold M1) into the store."""
-    demo_path = BASE_DIR.parent / DEMO_DATASET_REL
-    if not demo_path.exists():
+    """Load every bundled demo dataset (gold M1, 2026) into the store."""
+    paths = _demo_files()
+    if not paths:
         raise HTTPException(status_code=404, detail="Demo dataset is not bundled with this deployment.")
-    try:
-        loaded = load_ohlcv_csv(
-            demo_path.read_bytes(),
-            symbol="XAUUSD",
-            source_tz="UTC",
-            source_name=demo_path.name,
-        )
-    except DataValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    loaded_list: list[LoadedData] = []
+    for p in paths:
+        try:
+            loaded = load_ohlcv_csv(
+                p.read_bytes(),
+                symbol="XAUUSD",
+                source_tz="auto",
+                source_name=p.name,
+            )
+        except DataValidationError as e:
+            raise HTTPException(status_code=400, detail=f"{p.name}: {e}")
+        loaded_list.append(loaded)
+    combined = merge_loaded(loaded_list)
     dataset_id = str(uuid.uuid4())
-    DATA_STORE[dataset_id] = loaded
-    return _dataset_response(dataset_id, loaded)
+    DATA_STORE[dataset_id] = combined
+    return _dataset_response(dataset_id, combined)
 
 
 @app.post("/api/data/upload")
