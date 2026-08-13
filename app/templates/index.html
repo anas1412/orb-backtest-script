@@ -235,19 +235,40 @@
         <div class="two-col">
           <div class="panel">
             <div class="panel-header">
-              <h2>By direction</h2>
+              <h2>Monthly calendar</h2>
+              <div class="cal-nav">
+                <button type="button" id="calPrev" title="Previous month"><i data-lucide="chevron-left"></i></button>
+                <span id="calMonthLabel"></span>
+                <button type="button" id="calNext" title="Next month"><i data-lucide="chevron-right"></i></button>
+              </div>
             </div>
-            <div id="directionBreakdown" class="breakdown-list"></div>
+            <div class="cal-total" id="calTotal"></div>
+            <div id="calGrid" class="cal-grid"></div>
           </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>By month of year</h2>
+            </div>
+            <div id="monthBreakdown" class="breakdown-list"></div>
+          </div>
+        </div>
+
+        <div class="two-col">
           <div class="panel">
             <div class="panel-header">
               <h2>By day of week</h2>
             </div>
             <div id="dowBreakdown" class="breakdown-list"></div>
           </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Total and average per month</h2>
+            </div>
+            <div id="avgMonthBreakdown" class="breakdown-list"></div>
+          </div>
         </div>
 
-        <div class="panel">
+        <div class="panel trade-panel">
           <div class="panel-header">
             <h2>Trade log</h2>
             <button class="btn btn-ghost" id="btnExport" type="button"><i data-lucide="download"></i>Export CSV</button>

@@ -5,6 +5,7 @@
   let currentJobId = null;
   let lastResult = null;
   let lastSim = null;
+  let statusBase = "";
 
   const $ = (id) => document.getElementById(id);
 
@@ -122,10 +123,10 @@
       el.innerHTML =
         `${data.symbol} · ${nFiles} file${nFiles === 1 ? "" : "s"} · ` +
         `${data.rows.toLocaleString()} bars · ${range} UTC` +
-        `<span class="meta-elapsed" id="metaElapsed"></span>` +
         (perFile ? `<span class="meta-file-list">${perFile}</span>` : "");
     }
-    setStatus(`${data.symbol} · ${data.rows.toLocaleString()} bars · ${range}`, true);
+    statusBase = `${data.symbol} · ${data.rows.toLocaleString()} bars · ${range}`;
+    setStatus(statusBase, true);
   }
 
   async function handleUpload(e){
@@ -226,6 +227,7 @@
     currentJobId = null;
     lastResult = null;
     lastSim = null;
+    calendarMonth = null;
     $("btnGenerate").disabled = true;
     $("btnClear").disabled = true;
     $("datasetMeta").innerHTML = "No dataset loaded";
@@ -253,11 +255,37 @@
     return "Negative expectancy — this setup loses in the long run. Revisit the entry rules or abandon it.";
   }
 
+  function apiErrorMessage(err){
+    if (!err) return "Capital simulation failed";
+    const d = err.detail;
+    if (typeof d === "string") return d;
+    if (Array.isArray(d) && d.length && d[0]){
+      const loc = d[0].loc || [];
+      const field = loc[loc.length - 1];
+      const pretty = { initial_capital: "Initial capital", risk_pct: "Risk per trade", mode: "Risk basis" }[field] || field;
+      const msg = (d[0].msg || "invalid").replace(/^Value error, /, "");
+      return "Capital simulation: " + (pretty ? pretty + " — " : "") + msg;
+    }
+    return "Capital simulation failed";
+  }
+
   async function refreshSim(){
     const cap = readCapitalParams();
     if (!cap.enabled || !currentJobId){
       lastSim = null;
       renderAll();
+      return;
+    }
+    if (!isFinite(cap.initial_capital) || cap.initial_capital <= 0){
+      lastSim = null;
+      renderAll();
+      setStatus("Initial capital must be a number greater than 0", false);
+      return;
+    }
+    if (!isFinite(cap.risk_pct) || cap.risk_pct <= 0 || cap.risk_pct >= 10){
+      lastSim = null;
+      renderAll();
+      setStatus("Risk per trade must be a number between 0 and 10%", false);
       return;
     }
     try{
@@ -275,7 +303,7 @@
         renderAll();
         try{
           const err = await res.json();
-          setStatus(err.detail || "Capital simulation failed", false);
+          setStatus(apiErrorMessage(err), false);
         } catch(e){ /* no JSON body */ }
         return;
       }
@@ -302,8 +330,10 @@
     const sim = lastSim;
     const trades = sim ? lastResult.trades : null;
     renderStats(lastResult.stats, sim);
-    renderDirectionBreakdown(lastResult.breakdown_direction, trades, sim ? sim.pnl : null);
+    renderCalendar(lastResult.trades, sim ? sim.pnl : null);
     renderDowBreakdown(lastResult.breakdown_day_of_week, trades, sim ? sim.pnl : null);
+    renderMonthBreakdown(lastResult.trades, sim ? sim.pnl : null);
+    renderAvgMonthBreakdown(lastResult.trades, sim ? sim.pnl : null);
     renderTable(lastResult.trades, sim ? sim.pnl : null);
     renderEquityCurve(lastResult.equity_curve, sim ? sim.curve : null, sim ? readCapitalParams().initial_capital : null);
     const sub = document.querySelector(".chart-panel .panel-sub");
@@ -336,18 +366,90 @@
     $("statGrid").innerHTML = cards.join("");
   }
 
-  function renderDirectionBreakdown(bd, trades, pnl){
-    const dt = trades ? dollarTotals(trades, pnl) : null;
-    const rows = ["long", "short"].map(dir => {
-      const d = bd[dir];
-      const wr = d.win_rate !== null ? fmtPct(d.win_rate) : "—";
-      const usd = dt ? ` · ${fmtUsdSigned(dt[dir])}` : "";
-      return `<div class="breakdown-row">
-        <span class="label">${dir}</span>
-        <span class="value">${d.trades} trades · ${wr} win rate${usd}</span>
-      </div>`;
+  let calendarMonth = null;
+
+  function calCellValue(v, usd){
+    if (usd){
+      const abs = Math.abs(v);
+      return (v > 0 ? "+" : v < 0 ? "-" : "") + "$" + (abs >= 1000 ? (abs / 1000).toFixed(1) + "k" : abs.toFixed(0));
+    }
+    return (v > 0 ? "+" : "") + fmt(v, 1) + "R";
+  }
+
+  function renderCalendar(trades, pnl){
+    const grid = $("calGrid");
+    const label = $("calMonthLabel");
+    const totalEl = $("calTotal");
+    const next = $("calNext");
+    if (!trades || trades.length === 0){
+      grid.innerHTML = "";
+      label.textContent = "";
+      totalEl.textContent = "No trades";
+      totalEl.className = "cal-total";
+      next.disabled = true;
+      return;
+    }
+
+    const perDay = {};
+    trades.forEach((t, i) => {
+      const v = perDay[t.date] || { r: 0, usd: 0 };
+      v.r += t.r_multiple;
+      v.usd += pnl ? (pnl[i] || 0) : 0;
+      perDay[t.date] = v;
     });
-    $("directionBreakdown").innerHTML = rows.join("");
+
+    const lastDate = trades[trades.length - 1].date;
+    const lastY = +lastDate.slice(0, 4);
+    const lastM = +lastDate.slice(5, 7);
+
+    if (!calendarMonth ||
+        calendarMonth.getUTCFullYear() > lastY ||
+        (calendarMonth.getUTCFullYear() === lastY && calendarMonth.getUTCMonth() + 1 > lastM)){
+      calendarMonth = new Date(Date.UTC(lastY, lastM - 1, 1));
+    }
+
+    const y = calendarMonth.getUTCFullYear();
+    const m = calendarMonth.getUTCMonth();
+    const monthKey = `${y}-${String(m + 1).padStart(2, "0")}`;
+    const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    const firstDow = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7;
+
+    const useUsd = pnl != null;
+    let mTotal = 0, absMax = 1e-9;
+    Object.entries(perDay).forEach(([d, v]) => {
+      if (!d.startsWith(monthKey)) return;
+      const val = useUsd ? v.usd : v.r;
+      mTotal += val;
+      absMax = Math.max(absMax, Math.abs(val));
+    });
+
+    label.textContent = new Date(Date.UTC(y, m, 1))
+      .toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    const totalCls = mTotal > 0 ? "pos" : (mTotal < 0 ? "neg" : "");
+    totalEl.textContent = "Month: " + (useUsd ? fmtUsdSigned(mTotal) : (mTotal > 0 ? "+" : "") + fmt(mTotal, 1) + "R");
+    totalEl.className = "cal-total " + totalCls;
+    next.disabled = (y === lastY && m + 1 === lastM);
+
+    const dowNames = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+    let cells = dowNames.map(d => `<div class="cal-dow">${d}</div>`).join("");
+    for (let i = 0; i < firstDow; i++) cells += `<div class="cal-day empty"></div>`;
+    for (let d = 1; d <= daysInMonth; d++){
+      const key = `${monthKey}-${String(d).padStart(2, "0")}`;
+      const v = perDay[key];
+      let cls = "cal-day";
+      let inner = `<span class="cal-num">${d}</span>`;
+      if (v && (useUsd ? v.usd : v.r) !== 0){
+        const val = useUsd ? v.usd : v.r;
+        const alpha = 0.08 + 0.30 * (Math.abs(val) / absMax);
+        const color = val > 0 ? `rgba(107,197,147,${alpha})` : `rgba(217,114,103,${alpha})`;
+        cls += " has-value";
+        inner += `<span class="cal-val" style="background:${color}">${calCellValue(val, useUsd)}</span>`;
+      }
+      cells += `<div class="${cls}">${inner}</div>`;
+    }
+    let pad = (firstDow + daysInMonth) % 7;
+    if (pad) for (let i = 0; i < 7 - pad; i++) cells += `<div class="cal-day empty"></div>`;
+    grid.innerHTML = cells;
   }
 
   function renderDowBreakdown(dow, trades, pnl){
@@ -370,6 +472,67 @@
     $("dowBreakdown").innerHTML = rows.join("");
   }
 
+  function renderMonthBreakdown(trades, pnl){
+    if (!trades || trades.length === 0){
+      $("monthBreakdown").innerHTML = `<div class="breakdown-row"><span class="label">No trades</span></div>`;
+      return;
+    }
+    const byMonth = {};
+    trades.forEach((t, i) => {
+      const key = t.date.slice(0, 7);
+      const v = byMonth[key] || { n: 0, r: 0, usd: 0 };
+      v.n++;
+      v.r += t.r_multiple;
+      v.usd += pnl ? (pnl[i] || 0) : 0;
+      byMonth[key] = v;
+    });
+    const rows = Object.keys(byMonth).sort().map(k => {
+      const v = byMonth[k];
+      const rClass = v.r > 0 ? "pos" : (v.r < 0 ? "neg" : "");
+      const label = new Date(k + "-01T00:00:00Z")
+        .toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+      const usd = pnl ? ` · ${fmtUsdSigned(v.usd)}` : "";
+      return `<div class="breakdown-row">
+        <span class="label">${label}</span>
+        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R${usd}</span>
+      </div>`;
+    });
+    $("monthBreakdown").innerHTML = rows.join("");
+  }
+
+  const MONTH_ORDER = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  function renderAvgMonthBreakdown(trades, pnl){
+    if (!trades || trades.length === 0){
+      $("avgMonthBreakdown").innerHTML = `<div class="breakdown-row"><span class="label">No trades</span></div>`;
+      return;
+    }
+    const byMonth = {};
+    trades.forEach((t, i) => {
+      const name = new Date(t.date + "T00:00:00Z")
+        .toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
+      const v = byMonth[name] || { n: 0, r: 0, usd: 0 };
+      v.n++;
+      v.r += t.r_multiple;
+      v.usd += pnl ? (pnl[i] || 0) : 0;
+      byMonth[name] = v;
+    });
+    const rows = MONTH_ORDER.filter(m => byMonth[m]).map(name => {
+      const v = byMonth[name];
+      const avgR = v.r / v.n;
+      const rClass = v.r > 0 ? "pos" : (v.r < 0 ? "neg" : "");
+      const avgCls = avgR > 0 ? "pos" : (avgR < 0 ? "neg" : "");
+      const usd = pnl
+        ? ` · <span class="dim">${fmtUsdSigned(v.usd)} · ${fmtUsdSigned(v.usd / v.n)} avg</span>`
+        : "";
+      return `<div class="breakdown-row">
+        <span class="label">${name}</span>
+        <span class="value ${rClass}">${v.n} trade${v.n === 1 ? "" : "s"} · ${(v.r > 0 ? "+" : "")}${fmt(v.r)}R · <span class="avg ${avgCls}">${(avgR > 0 ? "+" : "")}${fmt(avgR)}R avg</span>${usd}</span>
+      </div>`;
+    });
+    $("avgMonthBreakdown").innerHTML = rows.join("");
+  }
+
   function renderTable(trades, pnl){
     const tbody = document.querySelector("#tradeTable tbody");
     tbody.innerHTML = trades.map((t, i) => {
@@ -380,13 +543,14 @@
       return `<tr>
         <td>${t.date}</td>
         <td class="${dirClass}">${t.direction}</td>
-        <td>${fmt(t.range_low)}–${fmt(t.range_high)}</td>
-        <td>${fmt(t.entry_price)}</td>
-        <td>${t.sl_moved ? fmt(t.sl_price) + " → " + fmt(t.sl_final) : fmt(t.sl_price)}</td>        <td>${fmt(t.tp_price)}</td>
-        <td>${fmt(t.exit_price)}</td>
+        <td class="num">${fmt(t.range_low)}–${fmt(t.range_high)}</td>
+        <td class="num">${fmt(t.entry_price)}</td>
+        <td class="num">${t.sl_moved ? fmt(t.sl_price) + " → " + fmt(t.sl_final) : fmt(t.sl_price)}</td>
+        <td class="num">${fmt(t.tp_price)}</td>
+        <td class="num">${fmt(t.exit_price)}</td>
         <td><span class="reason-tag">${t.exit_reason}</span></td>
-        <td class="${rClass}">${t.r_multiple > 0 ? '+' : ''}${fmt(t.r_multiple)}</td>
-        ${pnl ? `<td class="${pClass}">${fmtUsdSigned(p)}</td>` : ""}
+        <td class="num ${rClass}">${t.r_multiple > 0 ? '+' : ''}${fmt(t.r_multiple)}</td>
+        ${pnl ? `<td class="num ${pClass}">${fmtUsdSigned(p)}</td>` : ""}
       </tr>`;
     }).join("");
   }
@@ -536,9 +700,9 @@
             clearInterval(elapsedTimer);
             progressBar.style.width = "100%";
             pct = 100;
-            progressLabel.textContent = "Backtesting… 100% · " + fmtElapsed(performance.now() - t0);
-            const elapsedEl = $("metaElapsed");
-            if (elapsedEl) elapsedEl.textContent = " · " + fmtElapsed(performance.now() - t0);
+            const elapsed = fmtElapsed(performance.now() - t0);
+            progressLabel.textContent = "Backtesting… 100% · " + elapsed;
+            setStatus(statusBase + " · " + elapsed, true);
             data = msg.result;
           } else if (msg.type === "error"){
             throw new Error(msg.detail || "Backtest failed");
@@ -549,6 +713,7 @@
 
       currentJobId = data.job_id;
       lastResult = data;
+      calendarMonth = null;
 
       $("emptyState").style.display = "none";
       $("resultsSection").style.display = "flex";
@@ -599,6 +764,17 @@
   $("btnClear").addEventListener("click", handleClear);
   $("btnDemo").addEventListener("click", handleDemo);
   $("btnExport").addEventListener("click", handleExport);
+
+  $("calPrev").addEventListener("click", () => {
+    if (!calendarMonth) return;
+    calendarMonth = new Date(Date.UTC(calendarMonth.getUTCFullYear(), calendarMonth.getUTCMonth() - 1, 1));
+    renderCalendar(lastResult ? lastResult.trades : null, lastSim ? lastSim.pnl : null);
+  });
+  $("calNext").addEventListener("click", () => {
+    if (!calendarMonth) return;
+    calendarMonth = new Date(Date.UTC(calendarMonth.getUTCFullYear(), calendarMonth.getUTCMonth() + 1, 1));
+    renderCalendar(lastResult ? lastResult.trades : null, lastSim ? lastSim.pnl : null);
+  });
 
   // Stop ladder editor
   function syncLadderEmpty(){
