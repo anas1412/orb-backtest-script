@@ -338,6 +338,14 @@ body{
 }
 .stat-value.pos{ color: var(--pos-bright); }
 .stat-value.neg{ color: var(--neg-bright); }
+.stat-sub{
+  display:block;
+  font-family: var(--font-display);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
 
 /* ---------- Chart ---------- */
 .chart-panel{ padding: 18px 22px; position: relative; }

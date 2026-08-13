@@ -130,7 +130,7 @@
 
     const cards = [
       statCardHtml("Total trades", stats.total_trades, "neutral"),
-      statCardHtml("Win rate", fmtPct(stats.win_rate), "neutral"),
+      statCardHtml("Win rate", fmtPct(stats.win_rate) + (stats.win_rate_no_be !== null ? ` <span class="stat-sub">ex-BE ${fmtPct(stats.win_rate_no_be)}</span>` : ""), "neutral"),
       statCardHtml("Total R", (stats.total_r > 0 ? "+" : "") + fmt(stats.total_r), totalRClass),
       statCardHtml("Avg R / trade", (stats.average_r > 0 ? "+" : "") + fmt(stats.average_r), avgRClass),
       statCardHtml("Profit factor", stats.profit_factor !== null ? fmt(stats.profit_factor) : "—", "neutral"),

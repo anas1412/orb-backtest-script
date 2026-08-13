@@ -226,6 +226,7 @@ def _serialize_result(result: BacktestResult, job_id: str, loaded: LoadedData, p
             "losses": stats.losses,
             "timeouts": stats.timeouts,
             "win_rate": round(stats.win_rate, 4),
+            "win_rate_no_be": round(stats.win_rate_no_be, 4) if stats.win_rate_no_be is not None else None,
             "total_r": round(stats.total_r, 4),
             "average_r": round(stats.average_r, 4),
             "profit_factor": round(stats.profit_factor, 4) if stats.profit_factor is not None else None,

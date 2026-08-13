@@ -16,6 +16,7 @@ class Stats:
     losses: int
     timeouts: int
     win_rate: float
+    win_rate_no_be: float | None  # wins / (wins + losses), ignores 0R breakevens
     total_r: float
     average_r: float
     profit_factor: float | None
@@ -34,7 +35,7 @@ def compute_stats(result: BacktestResult) -> Stats:
     if len(trades) == 0:
         return Stats(
             total_trades=0, wins=0, losses=0, timeouts=0, win_rate=0.0,
-            total_r=0.0, average_r=0.0, profit_factor=None, max_drawdown_r=0.0,
+            win_rate_no_be=None, total_r=0.0, average_r=0.0, profit_factor=None, max_drawdown_r=0.0,
             expectancy_r=0.0, longest_win_streak=0, longest_loss_streak=0,
             long_trades=0, short_trades=0, long_win_rate=None, short_win_rate=None,
         )
@@ -47,6 +48,8 @@ def compute_stats(result: BacktestResult) -> Stats:
     total_r = float(r_values.sum())
     average_r = float(r_values.mean())
     win_rate = wins / len(trades)
+    decided = wins + losses
+    win_rate_no_be = (wins / decided) if decided > 0 else None
 
     gross_win = float(r_values[r_values > 0].sum())
     gross_loss = float(-r_values[r_values < 0].sum())
@@ -91,6 +94,7 @@ def compute_stats(result: BacktestResult) -> Stats:
         losses=losses,
         timeouts=timeouts_flat,
         win_rate=win_rate,
+        win_rate_no_be=win_rate_no_be,
         total_r=total_r,
         average_r=average_r,
         profit_factor=profit_factor,
