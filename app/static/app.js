@@ -384,18 +384,22 @@
       statCardHtml("Longest loss streak", stats.longest_loss_streak, "neg"));
 
     const bw = bestWorstPeriods(lastResult.trades);
+    const bwCard = (label, bestV, worstV, worstDate) => `
+      <div class="stat-card neutral bw-card">
+        <div class="stat-label">${label}</div>
+        <div class="stat-value pos">${bestV}</div>
+        <div class="stat-sub bw-worst">Worst: ${worstV} · ${worstDate}</div>
+      </div>`;
     if (bw){
       const [bd, wd] = [bw.bestDay, bw.worstDay];
       const [bm, wm] = [bw.bestMonth, bw.worstMonth];
       cards.push(
-        statCardHtml("Best / worst day",
-          `<span class="pos">${(bd[1] > 0 ? "+" : "")}${fmt(bd[1])}R</span> · <span class="neg">${fmt(wd[1])}R</span>`,
-          "neutral",
-          `<span class="stat-sub">Best ${dayLabel(bd[0])} · Worst ${dayLabel(wd[0])}</span>`),
-        statCardHtml("Best / worst month",
-          `<span class="pos">${(bm[1] > 0 ? "+" : "")}${fmt(bm[1])}R</span> · <span class="neg">${fmt(wm[1])}R</span>`,
-          "neutral",
-          `<span class="stat-sub">Best ${monthLabel(bm[0])} · Worst ${monthLabel(wm[0])}</span>`));
+        bwCard("Best / worst day",
+          (bd[1] > 0 ? "+" : "") + fmt(bd[1]) + "R",
+          fmt(wd[1]) + "R", dayLabel(wd[0])),
+        bwCard("Best / worst month",
+          (bm[1] > 0 ? "+" : "") + fmt(bm[1]) + "R",
+          fmt(wm[1]) + "R", monthLabel(wm[0])));
     } else {
       cards.push(
         statCardHtml("Best / worst day", "—", "neutral"),

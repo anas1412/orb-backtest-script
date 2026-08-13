@@ -405,6 +405,10 @@ body{
 }
 .stat-verdict{ letter-spacing: 0; line-height: 1.45; }
 
+.bw-card .stat-label{ text-align: center; }
+.bw-card .stat-value{ font-size: 28px; text-align: center; }
+.bw-worst{ text-align: center; color: var(--neg-bright); font-size: 11px; margin-top: 6px; }
+
 /* ---------- Chart ---------- */
 .chart-panel{ padding: 18px 22px; position: relative; }
 #equityChart{ width:100%; display:block; }
