@@ -341,6 +341,24 @@
     if (sub) sub.textContent = sim ? "Equity ($)" : "Cumulative R";
   }
 
+  function bestWorstPeriods(trades){
+    if (!trades || trades.length === 0) return null;
+    const byDay = {}, byMonth = {};
+    trades.forEach(t => {
+      byDay[t.date] = (byDay[t.date] || 0) + t.r_multiple;
+      const mk = t.date.slice(0, 7);
+      byMonth[mk] = (byMonth[mk] || 0) + t.r_multiple;
+    });
+    const best = o => Object.entries(o).reduce((a, b) => b[1] > a[1] ? b : a);
+    const worst = o => Object.entries(o).reduce((a, b) => b[1] < a[1] ? b : a);
+    return { bestDay: best(byDay), worstDay: worst(byDay), bestMonth: best(byMonth), worstMonth: worst(byMonth) };
+  }
+
+  const dayLabel = date => new Date(date + "T00:00:00Z")
+    .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  const monthLabel = key => new Date(key + "-01T00:00:00Z")
+    .toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+
   function renderStats(stats, sim){
     const totalRClass = stats.total_r > 0 ? "pos" : (stats.total_r < 0 ? "neg" : "neutral");
     const avgRClass = stats.average_r > 0 ? "pos" : (stats.average_r < 0 ? "neg" : "neutral");
@@ -364,6 +382,25 @@
         sim ? `<span class="stat-sub">${fmtUsd(sim.stats.max_drawdown_usd)} · ${sim.stats.max_drawdown_pct}%</span>` : ""),
       statCardHtml("Longest win streak", stats.longest_win_streak, "pos"),
       statCardHtml("Longest loss streak", stats.longest_loss_streak, "neg"));
+
+    const bw = bestWorstPeriods(lastResult.trades);
+    if (bw){
+      const [bd, wd] = [bw.bestDay, bw.worstDay];
+      const [bm, wm] = [bw.bestMonth, bw.worstMonth];
+      cards.push(
+        statCardHtml("Best / worst day",
+          `<span class="pos">${(bd[1] > 0 ? "+" : "")}${fmt(bd[1])}R</span> · <span class="neg">${fmt(wd[1])}R</span>`,
+          "neutral",
+          `<span class="stat-sub">Best ${dayLabel(bd[0])} · Worst ${dayLabel(wd[0])}</span>`),
+        statCardHtml("Best / worst month",
+          `<span class="pos">${(bm[1] > 0 ? "+" : "")}${fmt(bm[1])}R</span> · <span class="neg">${fmt(wm[1])}R</span>`,
+          "neutral",
+          `<span class="stat-sub">Best ${monthLabel(bm[0])} · Worst ${monthLabel(wm[0])}</span>`));
+    } else {
+      cards.push(
+        statCardHtml("Best / worst day", "—", "neutral"),
+        statCardHtml("Best / worst month", "—", "neutral"));
+    }
     $("statGrid").innerHTML = cards.join("");
   }
 
