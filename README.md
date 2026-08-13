@@ -9,7 +9,7 @@ project plan (`plan.md`, if included alongside this app).
 1. Marks the high/low of the first N minutes after a configurable session
    open time (UTC), default 00:00 UTC / 15 minutes.
 2. Watches for the first M1 candle to close outside that range within a
-   configurable search window (default 60 minutes).
+   configurable search window (default 180 minutes).
 3. Enters via market order (next bar's open) or limit order (resting at the
    broken boundary, expiring at the search-window deadline).
 4. Places the stop loss at the range midpoint by default (adjustable), and
@@ -39,13 +39,21 @@ used directly in a script or notebook without FastAPI.
 
 ## Running it
 
+One command (auto-creates a venv, installs deps, reads `PORT` env var, defaults to 8000):
+
 ```bash
-pip install fastapi "uvicorn[standard]" pandas numpy python-multipart jinja2
-cd <project root>
-python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+python3 run.py
 ```
 
 Then open `http://localhost:8000` in a browser.
+
+Already have the venv set up? Alternative:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
 
 ## Data
 
