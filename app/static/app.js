@@ -401,7 +401,7 @@
       ? statCardHtml(label,
           `<span class="bw-big">${bestPair[0]} · ${(bestPair[1] > 0 ? "+" : "")}${fmt(bestPair[1])}R</span>`,
           "pos",
-          `<span class="stat-sub bw-worst">Worst: ${worstPair[0]} · ${fmt(worstPair[1])}R</span>`)
+          `<span class="stat-sub bw-worst">Worst: ${worstPair[0] === bestPair[0] ? "—" : worstPair[0]} · ${fmt(worstPair[1])}R</span>`)
       : statCardHtml(label, "—", "neutral");
     if (bw){
       cards.push(
