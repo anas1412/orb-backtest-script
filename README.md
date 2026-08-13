@@ -3,6 +3,8 @@
 A Python + FastAPI backtesting tool for an Asia-session opening-range breakout
 strategy on Gold, M1 timeframe. All logic operates in UTC internally.
 
+![Asia Range Breakout dashboard](docs/screenshot.png)
+
 ## What it does
 
 1. Marks the high/low of the first N minutes after a configurable session
