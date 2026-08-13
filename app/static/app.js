@@ -99,6 +99,16 @@
       ladderSummary(p.sl_ladder) +
       `Trades are force-closed after <b>${p.session_max_hours}h</b> if neither level is hit. ` +
       (p.skip_weekends ? "Weekends are skipped." : "Weekends are included.");
+
+    const hint = $("searchWindowHint");
+    if (hint){
+      const [hh, mm] = (p.session_open_utc || "00:00").split(":").map(Number);
+      const open = hh * 60 + mm;
+      const start = open + (p.range_minutes || 0);
+      const end = start + (p.breakout_search_minutes || 0);
+      const hhmm = m => String(Math.floor(m / 60) % 24).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+      hint.textContent = `${p.breakout_search_minutes || 0} min → from ${hhmm(start)} to ${hhmm(end)}`;
+    }
   }
 
   function ladderSummary(ladder){
