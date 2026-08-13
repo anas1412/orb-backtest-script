@@ -184,7 +184,7 @@ async def run_backtest_endpoint(p: BacktestParams):
                 msg = q.get_nowait()
             except queue.Empty:
                 continue
-            yield json.dumps(msg, default=str) + "\n"
+            yield json.dumps(msg, default=str, allow_nan=False) + "\n"
             if msg["type"] in ("done", "error"):
                 return
 

@@ -181,8 +181,7 @@
         <td class="${dirClass}">${t.direction}</td>
         <td>${fmt(t.range_low)}–${fmt(t.range_high)}</td>
         <td>${fmt(t.entry_price)}</td>
-        <td>${t.sl_moved ? fmt(t.sl_price) + " → " + fmt(t.sl_final) : fmt(t.sl_price)}</td>
-        <td>${fmt(t.tp_price)}</td>
+        <td>${t.sl_moved ? fmt(t.sl_price) + " → " + fmt(t.sl_final) : fmt(t.sl_price)}</td>        <td>${fmt(t.tp_price)}</td>
         <td>${fmt(t.exit_price)}</td>
         <td><span class="reason-tag">${t.exit_reason}</span></td>
         <td class="${rClass}">${t.r_multiple > 0 ? '+' : ''}${fmt(t.r_multiple)}</td>

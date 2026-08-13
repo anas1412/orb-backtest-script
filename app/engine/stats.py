@@ -123,7 +123,11 @@ def trades_to_dataframe(result: BacktestResult) -> pd.DataFrame:
             "sl_price": round(t.sl_price, 4),
             "tp_price": round(t.tp_price, 4),
             "sl_moved": t.sl_moved,
-            "sl_final": round(t.sl_final, 4) if t.sl_moved else None,
+            # Final stop in force at exit: the moved stop when the half-TP
+            # rule fired, otherwise the original stop. Always a number so the
+            # JSON stream never carries NaN (json.dumps would emit a bare
+            # "NaN" token, which is invalid JSON for browsers).
+            "sl_final": round(t.sl_final, 4),
             "exit_price": round(t.exit_price, 4),
             "exit_time_utc": t.exit_time.isoformat(),
             "exit_reason": t.exit_reason,
