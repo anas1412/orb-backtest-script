@@ -134,6 +134,32 @@
     }
   }
 
+  async function handleDemo(){
+    const btn = $("btnDemo");
+    btn.disabled = true;
+    try{
+      const res = await fetch("/api/data/demo", { method: "POST" });
+      if (!res.ok){
+        const err = await res.json();
+        throw new Error(err.detail || "Demo dataset unavailable");
+      }
+      const data = await res.json();
+      currentDatasetId = data.dataset_id;
+      showDatasetMeta(data);
+      $("btnGenerate").disabled = false;
+      $("btnClear").disabled = false;
+      await handleGenerate({ start_date: "2026-05-01", end_date: "2026-08-12" });
+    } catch(err){
+      currentDatasetId = null;
+      $("btnGenerate").disabled = true;
+      $("datasetMeta").textContent = "Demo load failed";
+      setStatus("Demo load failed", false);
+      alert("Error: " + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function handleClear(){
     const id = currentDatasetId;
     if (id){
@@ -314,7 +340,7 @@
     ctx.fill();
   }
 
-  async function handleGenerate(){
+  async function handleGenerate(opts){
     if (!currentDatasetId){
       alert("Load a dataset first.");
       return;
@@ -326,6 +352,10 @@
 
     try{
       const params = readParams();
+      if (opts){
+        if (opts.start_date) params.start_date = opts.start_date;
+        if (opts.end_date) params.end_date = opts.end_date;
+      }
       const res = await fetch("/api/backtest/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -417,6 +447,7 @@
   $("fileUpload").addEventListener("change", handleUpload);
   $("btnGenerate").addEventListener("click", handleGenerate);
   $("btnClear").addEventListener("click", handleClear);
+  $("btnDemo").addEventListener("click", handleDemo);
   $("btnExport").addEventListener("click", handleExport);
 
   // Equity chart hover: crosshair + tooltip with date and cumulative R

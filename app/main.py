@@ -106,6 +106,30 @@ def _dataset_response(dataset_id: str, loaded: LoadedData) -> dict:
     }
 
 
+DEMO_DATASET_REL = "datasets/XAUUSD_M1_2026-05-01_2026-08-12.csv"
+DEMO_WINDOW = ("2026-05-01", "2026-08-12")
+
+
+@app.post("/api/data/demo")
+async def load_demo_data():
+    """Load the bundled demo dataset (May-Aug 2026 gold M1) into the store."""
+    demo_path = BASE_DIR.parent / DEMO_DATASET_REL
+    if not demo_path.exists():
+        raise HTTPException(status_code=404, detail="Demo dataset is not bundled with this deployment.")
+    try:
+        loaded = load_ohlcv_csv(
+            demo_path.read_bytes(),
+            symbol="XAUUSD",
+            source_tz="UTC",
+            source_name=demo_path.name,
+        )
+    except DataValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    dataset_id = str(uuid.uuid4())
+    DATA_STORE[dataset_id] = loaded
+    return _dataset_response(dataset_id, loaded)
+
+
 @app.post("/api/data/upload")
 async def upload_data(
     files: list[UploadFile] = File(...),
