@@ -15,6 +15,7 @@ UI at `http://localhost:8000`. No test suite, no pytest, no lint/typecheck confi
 ## Architecture
 
 - `app/engine/` is framework-agnostic and importable standalone (notebook/script): `data_loader` (CSV -> UTC DataFrame) -> `session` (daily windows, trading days) -> `strategy` (breakout detection, entry modes, SL/TP) -> `backtester` (per-day loop, exit simulation) -> `stats` (summary, trade log, equity curve).
+- `app/defaults.py` is the SINGLE source of truth for every tunable default value (strategy params, upload defaults, capital-sim defaults). `strategy.Params`, `main.BacktestParams`, `CapitalSimParams`, the export endpoint, and the `index.html` template (server-rendered `value=`/`checked=` plus an injected `window.DEFAULTS` JSON the JS reads) all draw from it. Never hardcode a default elsewhere; bounds/validation constraints stay with their models.
 - `app/main.py` is a thin transport layer: routes call the engine, then keep results in module-level in-memory dicts (`DATA_STORE`, `RESULT_STORE`). Everything is lost on restart; this is a single-user local tool.
 - README's "Verified behavior" section is the strategy spec; the engine docstrings are the closest thing to an authoritative description of intended behavior. Reconcile behavior changes against them.
 - Frontend is vanilla JS + a hand-rolled canvas equity chart (no chart library).

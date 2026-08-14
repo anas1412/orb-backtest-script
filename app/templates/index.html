@@ -59,12 +59,12 @@
           <div class="field-grid">
             <label class="field">
               <span>Symbol</span>
-              <input type="text" id="uploadSymbol" value="XAUUSD">
+              <input type="text" id="uploadSymbol" value="{{ defaults.symbol }}">
             </label>
             <label class="field">
               <span>Raw timestamp TZ</span>
               <select id="uploadTz">
-                <option value="auto" selected>Auto-detect (weekend gaps)</option>
+                <option value="auto" {% if defaults.upload_tz == 'auto' %}selected{% endif %}>Auto-detect (weekend gaps)</option>
                 <option value="UTC">UTC (GMT+0)</option>
                 <option value="Etc/GMT-1">GMT+1</option>
                 <option value="Etc/GMT-2">GMT+2 (EET)</option>
@@ -95,16 +95,16 @@
           <div class="field-grid">
             <label class="field">
               <span>Session open (UTC)</span>
-              <input type="time" id="sessionOpen" value="00:00">
+              <input type="time" id="sessionOpen" value="{{ defaults.session_open_utc }}">
             </label>
             <label class="field">
               <span>Range length (min)</span>
-              <input type="number" id="rangeMinutes" value="15" min="1" max="240">
+              <input type="number" id="rangeMinutes" value="{{ defaults.range_minutes }}" min="1" max="240">
             </label>
           </div>
           <label class="field">
             <span>Breakout search window (min)</span>
-            <input type="number" id="searchMinutes" value="14" min="1" max="480">
+            <input type="number" id="searchMinutes" value="{{ defaults.breakout_search_minutes }}" min="1" max="480">
           </label>
           <p class="hint">Minutes searched AFTER the range closes. Example: 14 = only the first 00:15 bucket.</p>
           <p class="hint" id="searchWindowHint"></p>
@@ -115,8 +115,8 @@
           <label class="field">
             <span>Entry mode</span>
             <select id="entryMode">
-              <option value="market">Market (next bar open)</option>
-              <option value="limit">Limit (at range boundary)</option>
+              <option value="market" {% if defaults.entry_mode == 'market' %}selected{% endif %}>Market (next bar open)</option>
+              <option value="limit" {% if defaults.entry_mode == 'limit' %}selected{% endif %}>Limit (at range boundary)</option>
             </select>
           </label>
         </section>
@@ -125,20 +125,20 @@
           <h3 class="group-title">Trade management</h3>
           <label class="field">
             <span>Max trade duration (hours)</span>
-            <input type="number" id="sessionMaxHours" value="1" min="0.5" step="0.5">
+            <input type="number" id="sessionMaxHours" value="{{ defaults.session_max_hours }}" min="0.5" step="0.5">
           </label>
           <div class="field">
             <span>Trade days</span>
             <label class="checkbox-field">
-              <input type="checkbox" id="allDays" checked>
+              <input type="checkbox" id="allDays" {% if defaults.trading_days == (0, 1, 2, 3, 4) %}checked{% endif %}>
               <span>All days (Mon-Fri)</span>
             </label>
             <div class="day-pills" id="dayPills">
-              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="0" checked><span>Mon</span></label>
-              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="1" checked><span>Tue</span></label>
-              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="2" checked><span>Wed</span></label>
-              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="3" checked><span>Thu</span></label>
-              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="4" checked><span>Fri</span></label>
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="0" {% if 0 in defaults.trading_days %}checked{% endif %}><span>Mon</span></label>
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="1" {% if 1 in defaults.trading_days %}checked{% endif %}><span>Tue</span></label>
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="2" {% if 2 in defaults.trading_days %}checked{% endif %}><span>Wed</span></label>
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="3" {% if 3 in defaults.trading_days %}checked{% endif %}><span>Thu</span></label>
+              <label class="day-pill"><input type="checkbox" class="day-checkbox" value="4" {% if 4 in defaults.trading_days %}checked{% endif %}><span>Fri</span></label>
             </div>
           </div>
         </section>
@@ -149,12 +149,12 @@
           <h3 class="group-title">Risk</h3>
           <label class="field">
             <span>SL position (fraction of range from midpoint)</span>
-            <input type="number" id="slPct" value="0.5" min="0" max="2" step="0.05">
+            <input type="number" id="slPct" value="{{ defaults.sl_pct_of_range }}" min="0" max="2" step="0.05">
           </label>
           <p class="hint">0.5 = SL at range midpoint (default). 1.0 = SL at opposite boundary.</p>
           <label class="field">
             <span>Take profit (R multiple)</span>
-            <input type="number" id="tpRR" value="2.0" min="0.1" step="0.1">
+            <input type="number" id="tpRR" value="{{ defaults.tp_rr }}" min="0.1" step="0.1">
           </label>
           <label class="field">
             <span>Stop ladder (trigger R → stop R)</span>
@@ -170,11 +170,11 @@
           <div class="field-grid">
             <label class="field">
               <span>Spread (pips)</span>
-              <input type="number" id="spreadPips" value="0" min="0" step="0.1">
+              <input type="number" id="spreadPips" value="{{ defaults.spread_pips }}" min="0" step="0.1">
             </label>
             <label class="field">
               <span>Slippage (pips)</span>
-              <input type="number" id="slippagePips" value="0" min="0" step="0.1">
+              <input type="number" id="slippagePips" value="{{ defaults.slippage_pips }}" min="0" step="0.1">
             </label>
           </div>
         </section>
@@ -184,24 +184,24 @@
         <section class="group">
           <h3 class="group-title">Capital simulation</h3>
           <label class="field checkbox-field">
-            <input type="checkbox" id="capitalEnabled">
+            <input type="checkbox" id="capitalEnabled" {% if defaults.capital_enabled %}checked{% endif %}>
             <span>Enable capital simulation</span>
           </label>
           <p class="hint">Sizes every trade's dollar risk from your bankroll. Pure post-process over the backtest — no re-run needed, tweak any value and the results update instantly.</p>
           <div id="capitalControls">
           <label class="field">
             <span>Initial capital ($)</span>
-            <input type="number" id="capitalInitial" value="10000" min="1" step="100">
+            <input type="number" id="capitalInitial" value="{{ defaults.capital_initial }}" min="1" step="100">
           </label>
           <label class="field">
             <span>Risk per trade (%)</span>
-            <input type="number" id="capitalRiskPct" value="1" min="0.01" max="9.99" step="0.1">
+            <input type="number" id="capitalRiskPct" value="{{ defaults.capital_risk_pct }}" min="0.01" max="9.99" step="0.1">
           </label>
           <label class="field">
             <span>Risk basis</span>
             <select id="capitalMode">
-              <option value="fixed" selected>Fixed — % of initial capital</option>
-              <option value="compounding">Compounding — % of current equity</option>
+              <option value="fixed" {% if defaults.capital_mode == 'fixed' %}selected{% endif %}>Fixed — % of initial capital</option>
+              <option value="compounding" {% if defaults.capital_mode == 'compounding' %}selected{% endif %}>Compounding — % of current equity</option>
             </select>
           </label>
           <p class="hint">Fixed risks the same dollar amount every trade. Compounding sizes each trade off the current account: wins grow the risk, losses shrink it.</p>
@@ -330,6 +330,7 @@
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script>window.DEFAULTS = {{ defaults | tojson }};</script>
 <script src="/static/app.js"></script>
 </body>
 </html>

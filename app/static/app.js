@@ -105,16 +105,16 @@
   function readCapitalParams(){
     return {
       enabled: $("capitalEnabled").checked,
-      initial_capital: parseFloat($("capitalInitial").value) || 0,
-      risk_pct: parseFloat($("capitalRiskPct").value) || 0,
-      mode: $("capitalMode").value,
+      initial_capital: parseFloat($("capitalInitial").value) || window.DEFAULTS.capital_initial,
+      risk_pct: parseFloat($("capitalRiskPct").value) || window.DEFAULTS.capital_risk_pct,
+      mode: $("capitalMode").value || window.DEFAULTS.capital_mode,
     };
   }
 
   function readParams(){
     return {
       dataset_id: currentDatasetId,
-      session_open_utc: $("sessionOpen").value || "00:00",
+      session_open_utc: $("sessionOpen").value || window.DEFAULTS.session_open_utc,
       range_minutes: parseInt($("rangeMinutes").value, 10),
       breakout_search_minutes: parseInt($("searchMinutes").value, 10),
       entry_mode: $("entryMode").value,
@@ -130,7 +130,7 @@
 
   function readTradingDays(){
     if ($("allDays").checked){
-      return [0, 1, 2, 3, 4];
+      return window.DEFAULTS.all_weekdays.slice();
     }
     const days = [];
     document.querySelectorAll(".day-checkbox").forEach(cb => {
@@ -1070,7 +1070,7 @@
     updateSummary();
   });
 
-  [[0.5, -0.5]].forEach(([trigger, sl]) => addLadderRow(trigger, sl));
+  window.DEFAULTS.sl_ladder.forEach(([trigger, sl]) => addLadderRow(trigger, sl));
   syncLadderEmpty();
 
   // Capital simulation: recompute (and re-render) on any change, debounced.

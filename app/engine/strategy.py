@@ -19,6 +19,7 @@ from typing import Literal
 
 import pandas as pd
 
+from ..defaults import DEFAULTS
 from .session import SessionRange
 
 Direction = Literal["long", "short"]
@@ -27,25 +28,25 @@ EntryMode = Literal["market", "limit"]
 
 @dataclass
 class Params:
-    session_open_utc: str = "00:00"
-    range_minutes: int = 15
-    breakout_search_minutes: int = 14
-    entry_mode: EntryMode = "market"
-    sl_pct_of_range: float = 0.5
-    tp_rr: float = 2.0
-    spread_pips: float = 0.0
-    slippage_pips: float = 0.0
-    session_max_hours: float = 1.0
+    session_open_utc: str = DEFAULTS["session_open_utc"]
+    range_minutes: int = DEFAULTS["range_minutes"]
+    breakout_search_minutes: int = DEFAULTS["breakout_search_minutes"]
+    entry_mode: EntryMode = DEFAULTS["entry_mode"]
+    sl_pct_of_range: float = DEFAULTS["sl_pct_of_range"]
+    tp_rr: float = DEFAULTS["tp_rr"]
+    spread_pips: float = DEFAULTS["spread_pips"]
+    slippage_pips: float = DEFAULTS["slippage_pips"]
+    session_max_hours: float = DEFAULTS["session_max_hours"]
     # ISO weekdays (Mon=0 ... Fri=4) on which trades are taken; Sat/Sun excluded.
-    trading_days: tuple[int, ...] = (0, 1, 2, 3, 4)
+    trading_days: tuple[int, ...] = DEFAULTS["trading_days"]
     # Stop-management: a ladder of (trigger_R, sl_R_from_entry) steps. R is the
     # ORIGINAL risk distance (entry to initial SL), fixed for the whole trade:
     # a moved stop never re-anchors later steps. When price reaches
     # trigger_R, the SL moves to sl_R_from_entry (negative = still below entry,
     # 0.0 = breakeven, positive = locked profit). Steps apply in order, each
     # move takes effect from the next candle on. Empty tuple = no moves.
-    sl_ladder: tuple[tuple[float, float], ...] = ((0.5, -0.5),)
-    pip_size: float = 0.01  # gold: 1 pip = $0.01 by common retail convention
+    sl_ladder: tuple[tuple[float, float], ...] = DEFAULTS["sl_ladder"]
+    pip_size: float = DEFAULTS["pip_size"]  # gold: 1 pip = $0.01 by common retail convention
 
 
 @dataclass

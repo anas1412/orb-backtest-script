@@ -26,6 +26,7 @@ from app.engine.backtester import run_backtest, BacktestResult
 from app.engine.stats import (
     compute_stats, trades_to_dataframe, equity_curve, simulate_capital
 )
+from app.defaults import DEFAULTS
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -65,17 +66,17 @@ RESULT_STORE: dict[str, BacktestResult] = {}
 
 class BacktestParams(BaseModel):
     dataset_id: str
-    session_open_utc: str = "00:00"
-    range_minutes: int = Field(15, ge=1, le=240)
-    breakout_search_minutes: int = Field(14, ge=1, le=480)
-    entry_mode: str = "market"
-    sl_pct_of_range: float = Field(0.5, ge=0.0, le=5.0)
-    tp_rr: float = Field(2.0, gt=0.0)
-    sl_ladder: list[list[float]] = Field(default_factory=lambda: [[0.5, -0.5]])
-    spread_pips: float = Field(0.0, ge=0.0)
-    slippage_pips: float = Field(0.0, ge=0.0)
-    session_max_hours: float = Field(1.0, gt=0.0)
-    trading_days: list[int] = [0, 1, 2, 3, 4]
+    session_open_utc: str = DEFAULTS["session_open_utc"]
+    range_minutes: int = Field(DEFAULTS["range_minutes"], ge=1, le=240)
+    breakout_search_minutes: int = Field(DEFAULTS["breakout_search_minutes"], ge=1, le=480)
+    entry_mode: str = DEFAULTS["entry_mode"]
+    sl_pct_of_range: float = Field(DEFAULTS["sl_pct_of_range"], ge=0.0, le=5.0)
+    tp_rr: float = Field(DEFAULTS["tp_rr"], gt=0.0)
+    sl_ladder: list[list[float]] = Field(default_factory=lambda: [list(step) for step in DEFAULTS["sl_ladder"]])
+    spread_pips: float = Field(DEFAULTS["spread_pips"], ge=0.0)
+    slippage_pips: float = Field(DEFAULTS["slippage_pips"], ge=0.0)
+    session_max_hours: float = Field(DEFAULTS["session_max_hours"], gt=0.0)
+    trading_days: list[int] = Field(default_factory=lambda: list(DEFAULTS["trading_days"]))
     start_date: Optional[str] = None
     end_date: Optional[str] = None
 
@@ -108,7 +109,9 @@ class BacktestParams(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html")
+    return templates.TemplateResponse(
+        request=request, name="index.html", context={"defaults": DEFAULTS}
+    )
 
 
 def _dataset_response(dataset_id: str, loaded: LoadedData) -> dict:
@@ -374,9 +377,9 @@ def _serialize_result(result: BacktestResult, job_id: str, loaded: LoadedData, p
 
 
 class CapitalSimParams(BaseModel):
-    initial_capital: float = Field(10000.0, gt=0.0)
-    risk_pct: float = Field(1.0, gt=0.0, lt=10.0)
-    mode: Literal["fixed", "compounding"] = "fixed"
+    initial_capital: float = Field(DEFAULTS["capital_initial"], gt=0.0)
+    risk_pct: float = Field(DEFAULTS["capital_risk_pct"], gt=0.0, lt=10.0)
+    mode: Literal["fixed", "compounding"] = DEFAULTS["capital_mode"]
 
 
 @app.post("/api/backtest/simulate/{job_id}")
@@ -405,9 +408,9 @@ async def simulate_capital_endpoint(job_id: str, p: CapitalSimParams):
 async def export_trades_csv(
     job_id: str,
     capital: int = 0,
-    initial_capital: float = 10000.0,
-    risk_pct: float = 1.0,
-    mode: Literal["fixed", "compounding"] = "fixed",
+    initial_capital: float = DEFAULTS["capital_initial"],
+    risk_pct: float = DEFAULTS["capital_risk_pct"],
+    mode: Literal["fixed", "compounding"] = DEFAULTS["capital_mode"],
 ):
     result = RESULT_STORE.get(job_id)
     if result is None:
