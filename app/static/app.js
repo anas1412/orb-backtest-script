@@ -700,9 +700,18 @@
       const prect = $("mcPanel").getBoundingClientRect();
       const cx = e.clientX - prect.left;
       const cy = e.clientY - prect.top;
-      mcTooltip.style.left = (cx > prect.width - 150 ? cx - 168 : cx + 14) + "px";
-      mcTooltip.style.top = Math.max(4, cy - 14) + "px";
       mcTooltip.style.display = "block";
+      const tw = mcTooltip.offsetWidth || 0;
+      const th = mcTooltip.offsetHeight || 0;
+      let left = cx + 14;
+      if (left + tw > prect.width - 4){
+        left = cx - 14 - tw;
+        if (left < 4) left = cx + 4;
+      }
+      let top = cy - Math.round(th / 2);
+      top = Math.max(6, Math.min(top, prect.height - th - 6));
+      mcTooltip.style.left = left + "px";
+      mcTooltip.style.top = top + "px";
     };
 
     canvas.onmouseleave = () => {

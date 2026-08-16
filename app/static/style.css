@@ -48,13 +48,14 @@ html, body{
 /* Background texture: faint horizontal scan lines evoke a price-chart grid without drawing a literal chart */
 body{
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background-image:
     linear-gradient(var(--bg), var(--bg)),
     repeating-linear-gradient(180deg, rgba(201,161,59,0.018) 0px, rgba(201,161,59,0.018) 1px, transparent 1px, transparent 34px);
 }
 
-.app-shell{ height:100vh; display:flex; flex-direction:column; }
+.app-shell{ height:100vh; height:100dvh; display:flex; flex-direction:column; }
 @media (max-width: 900px){
   body{ height:auto; overflow:auto; }
   .app-shell{ height:auto; }
@@ -347,6 +348,7 @@ body{
 .btn-generate{
   width: 100%;
   padding: 13px 16px;
+  padding-bottom: calc(13px + env(safe-area-inset-bottom, 0px));
   font-size: 13px;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -680,7 +682,7 @@ tbody tr:hover{ background: var(--panel-raised); }
 .toasts{
   position: fixed;
   right: 16px;
-  bottom: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   z-index: 80;
   display: flex;
   flex-direction: column;
@@ -742,7 +744,7 @@ tbody tr:hover{ background: var(--panel-raised); }
 .toast-close:hover{ color: var(--text); border-color: var(--text-faint); }
 
 /* ---------- Monte Carlo ---------- */
-.mc-panel{ padding: 18px 22px; }
+.mc-panel{ padding: 18px 22px; position: relative; }
 .mc-summary{ margin-bottom: 14px; }
 .mc-variant{
   border-top: 1px solid var(--border-soft);
