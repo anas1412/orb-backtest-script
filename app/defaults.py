@@ -34,4 +34,13 @@ DEFAULTS: dict = {
     "capital_initial": 10000.0,
     "capital_risk_pct": 1.0,
     "capital_mode": "fixed",
+    # --- monte carlo ---
+    "montecarlo_iterations": 1000,
+    "montecarlo_sample_mode": "bootstrap",
+    "montecarlo_seed": None,  # None = random (non-deterministic)
+    "montecarlo_capital": 10000.0,
+    "montecarlo_risk_pct": 2.0,
+    "montecarlo_sizing": "fixed",
+    "montecarlo_target_pct": 8.0,
+    "montecarlo_max_dd_pct": 10.0,
 }

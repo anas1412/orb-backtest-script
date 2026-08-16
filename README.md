@@ -72,6 +72,7 @@ source's raw timestamp timezone before uploading.
 - `GET /api/data/status/{dataset_id}` — check a loaded dataset
 - `POST /api/backtest/run` — run a backtest with a given parameter set
 - `POST /api/backtest/simulate/{job_id}` — size the trade log onto a dollar account (see below)
+- `POST /api/backtest/montecarlo/{job_id}` — Monte Carlo across resampled trade orders (see below)
 - `GET /api/backtest/export/{job_id}` — download the trade log as CSV; optional query params `capital=1&initial_capital=10000&risk_pct=1&mode=fixed|compounding` add a `pnl_usd` column
 
 ## Capital simulation
@@ -86,8 +87,48 @@ A pure post-process over the backtest's R-multiples (no re-run, instant):
 
 When enabled, the dashboard shows dollar figures alongside R everywhere:
 final equity, total P&L and return %, dollar profit factor, dollar max
-drawdown, a P&L column in the trade table, and an equity chart drawn in $
-with cumulative R overlaid on the right axis.
+drawdown, a P&L column in the trade table, and an equity chart drawn in $.
+Without the capital sim, the equity chart stays in cumulative R.
+
+## Monte Carlo
+
+A second pure post-process over the trade R-multiples (no re-run). Each
+simulated **account** is a full run: the observed outcomes are resampled,
+re-sized through the same `simulate_capital` math, and followed trade by trade
+until it reaches the target or blows (breaches the drawdown limit) - whichever
+happens first:
+
+- `iterations` — how many **accounts** to test (default 1,000; cap 10,000).
+- `sample_mode` — `bootstrap` (default) draws the R values with replacement
+  (random trades; tests how robust the edge is to a lucky or unlucky mix of
+  winners/losers); `shuffle` randomizes the trade ORDER instead (same trades,
+  tests sequence luck / drawdown depth). `both` runs the two independently.
+- `seed` — optional integer; when set, the run is fully reproducible
+  (`np.random.default_rng(seed)`); when omitted it is random.
+- `initial_capital` / `risk_pct` / `sizing` — the same bankroll parameters as
+  the capital simulation (fixed vs compounding risk basis).
+- `target_pct` — the account return you need back; accounts that reach it
+  first are counted as **passed**.
+- `max_dd_pct` — the deepest drawdown you would tolerate; accounts that
+  breach it first are counted as **blown**.
+
+The response reports per mode: percentiles (5/25/50/75/95) of the stopped
+final return % (snapped to the challenge boundaries), of the stopped max
+drawdown %, and of trades-to-stop (how many trades accounts ran before
+pausing), the actual (realized) path paused the same way (so if the real
+account would have passed, its reported result is exactly `+target_pct`),
+`p_loss`, a per-trade histogram of how many trades each account took before
+pausing, split by outcome (one bin per trade: `[[center, passed, blown,
+neither], ...]`), and account outcomes: `total_accounts`, `passed_accounts`,
+`blown_accounts`, `pass_rate`, `risk_of_ruin`, plus `avg_trades_to_target` /
+`avg_trades_to_blow` (mean number of trades it took among accounts that
+passed / blew). Every account is a challenge and stops at its FIRST boundary:
+passing accounts are sized at exactly `+target_pct` (the challenge pays the
+target, not more), blown accounts at exactly `-max_dd_pct` (the account is
+halted at its max loss), and the remainder ran all trades without hitting
+either. No account can report a return past its own boundary. Also note
+shuffle preserves the sum of R, so for fixed sizing its drawdown spread is
+the informative output; bootstrap's goal is edge robustness.
 
 ## Verified behavior (tested during build)
 

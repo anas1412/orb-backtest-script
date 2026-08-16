@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import queue
 import re
 import threading
 import uuid
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
@@ -16,7 +18,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, model_validator
-import io
 
 from app.engine.data_loader import (
     load_ohlcv_csv, merge_loaded, DataValidationError, LoadedData
@@ -26,6 +27,7 @@ from app.engine.backtester import run_backtest, BacktestResult
 from app.engine.stats import (
     compute_stats, trades_to_dataframe, equity_curve, simulate_capital
 )
+from app.engine.montecarlo import run_monte_carlo
 from app.defaults import DEFAULTS
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -380,6 +382,53 @@ class CapitalSimParams(BaseModel):
     initial_capital: float = Field(DEFAULTS["capital_initial"], gt=0.0)
     risk_pct: float = Field(DEFAULTS["capital_risk_pct"], gt=0.0, lt=10.0)
     mode: Literal["fixed", "compounding"] = DEFAULTS["capital_mode"]
+
+
+class MonteCarloParams(BaseModel):
+    iterations: int = Field(DEFAULTS["montecarlo_iterations"], ge=1, le=10000)
+    sample_mode: Literal["shuffle", "bootstrap", "both"] = DEFAULTS["montecarlo_sample_mode"]
+    seed: Optional[int] = Field(None, ge=0)
+    initial_capital: float = Field(DEFAULTS["montecarlo_capital"], gt=0.0)
+    risk_pct: float = Field(DEFAULTS["montecarlo_risk_pct"], gt=0.0, lt=10.0)
+    sizing: Literal["fixed", "compounding"] = DEFAULTS["montecarlo_sizing"]
+    target_pct: float = Field(DEFAULTS["montecarlo_target_pct"], gt=0.0)
+    max_dd_pct: float = Field(DEFAULTS["montecarlo_max_dd_pct"], gt=0.0)
+
+
+@app.post("/api/backtest/montecarlo/{job_id}")
+async def montecarlo_endpoint(job_id: str, p: MonteCarloParams):
+    result = RESULT_STORE.get(job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Backtest result not found.")
+    try:
+        variants = run_monte_carlo(
+            trades=result.trades,
+            iterations=p.iterations,
+            sample_mode=p.sample_mode,
+            seed=p.seed,
+            initial_capital=p.initial_capital,
+            risk_pct=p.risk_pct,
+            sizing=p.sizing,
+            target_pct=p.target_pct,
+            max_dd_pct=p.max_dd_pct,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "job_id": job_id,
+        "n_trades": len(result.trades),
+        "params": {
+            "iterations": p.iterations,
+            "sample_mode": p.sample_mode,
+            "seed": p.seed,
+            "initial_capital": p.initial_capital,
+            "risk_pct": p.risk_pct,
+            "sizing": p.sizing,
+            "target_pct": p.target_pct,
+            "max_dd_pct": p.max_dd_pct,
+        },
+        "variants": {mode: asdict(v) for mode, v in variants.items()},
+    }
 
 
 @app.post("/api/backtest/simulate/{job_id}")

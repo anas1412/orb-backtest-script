@@ -5,6 +5,7 @@
   let currentJobId = null;
   let lastResult = null;
   let lastSim = null;
+  let lastMc = null;
   let statusBase = "";
 
   const $ = (id) => document.getElementById(id);
@@ -108,6 +109,20 @@
       initial_capital: parseFloat($("capitalInitial").value) || window.DEFAULTS.capital_initial,
       risk_pct: parseFloat($("capitalRiskPct").value) || window.DEFAULTS.capital_risk_pct,
       mode: $("capitalMode").value || window.DEFAULTS.capital_mode,
+    };
+  }
+
+  function readMcParams(){
+    const seedRaw = $("mcSeed").value.trim();
+    return {
+      iterations: Math.max(1, Math.min(10000, Math.round(parseFloat($("mcIterations").value) || window.DEFAULTS.montecarlo_iterations))),
+      sample_mode: $("mcSampleMode").value || window.DEFAULTS.montecarlo_sample_mode,
+      seed: seedRaw === "" ? null : Math.max(0, Math.round(Number(seedRaw) || 0)),
+      initial_capital: parseFloat($("mcCapital").value) || window.DEFAULTS.montecarlo_capital,
+      risk_pct: parseFloat($("mcRiskPct").value) || window.DEFAULTS.montecarlo_risk_pct,
+      sizing: $("mcSizing").value || window.DEFAULTS.montecarlo_sizing,
+      target_pct: parseFloat($("mcTargetPct").value) || window.DEFAULTS.montecarlo_target_pct,
+      max_dd_pct: parseFloat($("mcMaxDdPct").value) || window.DEFAULTS.montecarlo_max_dd_pct,
     };
   }
 
@@ -314,14 +329,17 @@
     currentJobId = null;
     lastResult = null;
     lastSim = null;
+    lastMc = null;
     calendarMonth = null;
     yearNav = null;
     $("btnGenerate").disabled = true;
     $("btnClear").disabled = true;
+    $("btnMonteCarlo").disabled = true;
     $("datasetMeta").innerHTML = "No dataset loaded";
     setStatus("No dataset loaded", false);
     $("resultsSection").style.display = "none";
     $("emptyState").style.display = "";
+    renderMc();
     const input = $("fileUpload");
     input.value = "";
     equityState = null;
@@ -401,6 +419,299 @@
       lastSim = null;
     }
     renderAll();
+  }
+
+  async function runMonteCarlo(){
+    if (!currentJobId){
+      showToast("No backtest yet", "Run a backtest first, then resample its trades.", "info");
+      return;
+    }
+    const p = readMcParams();
+    if (!isFinite(p.initial_capital) || p.initial_capital <= 0 ||
+        !isFinite(p.risk_pct) || p.risk_pct <= 0 || p.risk_pct >= 10){
+      showToast("Monte Carlo params", "Initial capital must be greater than 0 and risk per trade between 0 and 10%.", "error");
+      return;
+    }
+    const btn = $("btnMonteCarlo");
+    btn.disabled = true;
+    btn.querySelector(".btn-label").textContent = "Resampling…";
+    try{
+      const res = await fetch(`/api/backtest/montecarlo/${currentJobId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          iterations: p.iterations,
+          sample_mode: p.sample_mode,
+          seed: p.seed,
+          initial_capital: p.initial_capital,
+          risk_pct: p.risk_pct,
+          sizing: p.sizing,
+          target_pct: p.target_pct,
+          max_dd_pct: p.max_dd_pct,
+        }),
+      });
+      if (!res.ok){
+        const err = await res.json();
+        throw new Error(err.detail || "Monte Carlo failed");
+      }
+      lastMc = await res.json();
+    } catch(e){
+      lastMc = null;
+      renderMc();
+      showToast("Monte Carlo failed", friendlyError(e.message), "error");
+    } finally {
+      btn.querySelector(".btn-label").textContent = "Run Monte Carlo";
+      btn.disabled = !currentJobId;
+    }
+    try{
+      renderMc();
+    } catch(e){
+      console.error(e);
+      showToast("Monte Carlo render", friendlyError(e.message), "error");
+    }
+  }
+
+  function mcPctMap(v){
+    return { p5: v.p5, p25: v.p25, p50: v.p50, p75: v.p75, p95: v.p95 };
+  }
+
+  function renderMc(){
+    const panel = $("mcPanel");
+    const empty = $("mcEmptyState");
+    if (!lastMc){
+      if (panel) panel.style.display = "none";
+      if (empty) empty.style.display = "";
+      return;
+    }
+    const { params, variants } = lastMc;
+    const pctv = (x, nd=1) => (x === null || x === undefined) ? "—" : (x > 0 ? "+" : "") + Number(x).toFixed(nd) + "%";
+    const pct = (x) => (x === null || x === undefined) ? "—" : (x * 100).toFixed(0) + "%";
+
+    const nameOf = m => m === "shuffle" ? "Shuffle" : "Bootstrap";
+    const describe = m => m === "shuffle"
+      ? "Same trades, random order — tests sequence luck (drawdown depth & curve shape)."
+      : "Same distribution, resampled with replacement — tests how robust the edge is to a lucky / unlucky trade mix.";
+
+    const sizingLabel = params.sizing === "compounding" ? "compounding" : "fixed";
+    $("mcModeLabel").textContent =
+      `${params.iterations.toLocaleString()} accounts · ${sizingLabel} risk · ` +
+      (params.seed === null ? "random seed" : "seed " + params.seed);
+
+    const target = params.target_pct;
+    const ddLimit = params.max_dd_pct;
+
+    let blockHtml = "";
+    ["shuffle", "bootstrap"].forEach(mode => {
+      const v = variants[mode];
+      if (!v) return;
+      const passRate = pct(v.pass_rate);
+      const ruin = pct(v.risk_of_ruin != null ? v.risk_of_ruin : v.blown_accounts / v.total_accounts);
+      const weeksToPass = v.avg_trades_to_target == null ? "—" : (v.avg_trades_to_target / 5).toFixed(1) + " weeks";
+      const passCls = v.pass_rate >= 0.5 ? "pos" : (v.pass_rate > 0 ? "neutral" : "neg");
+      const ruinCls = ruin === "0%" ? "pos" : (ruin === "100%" ? "neg" : "neutral");
+
+      blockHtml += `
+        <div class="mc-variant">
+          <div class="mc-variant-head">
+            <h3>${nameOf(mode)}</h3>
+            <span class="panel-sub">${describe(mode)}</span>
+          </div>
+          <div class="mc-callout-row">
+            <div class="mc-callout ${passCls}">
+              <div class="mc-callout-value">${passRate}</div>
+              <div class="mc-callout-label">pass rate — reached +${target}% first</div>
+            </div>
+            <div class="mc-callout ${ruinCls}">
+              <div class="mc-callout-value">${ruin}</div>
+              <div class="mc-callout-label">risk of ruin — hit −${ddLimit}% first</div>
+            </div>
+            <div class="mc-callout neutral">
+              <div class="mc-callout-value">${weeksToPass}</div>
+              <div class="mc-callout-label">avg weeks to pass — reaching +${target}%</div>
+            </div>
+          </div>
+          <div class="mc-accounts">
+            <div class="mc-acct-cell">
+              <span>Total accounts</span>
+              <b>${v.total_accounts.toLocaleString()}</b>
+            </div>
+            <div class="mc-acct-cell">
+              <span>Passed</span>
+              <b class="pos">${v.passed_accounts.toLocaleString()}</b>
+            </div>
+            <div class="mc-acct-cell">
+              <span>Blown</span>
+              <b class="neg">${v.blown_accounts.toLocaleString()}</b>
+            </div>
+            <div class="mc-acct-cell">
+              <span>Pass rate</span>
+              <b class="pos">${(v.pass_rate * 100).toFixed(1)}%</b>
+            </div>
+            <div class="mc-acct-cell">
+              <span>Avg trades → target</span>
+              <b>${v.avg_trades_to_target == null ? "—" : Number(v.avg_trades_to_target).toFixed(1)}</b>
+            </div>
+            <div class="mc-acct-cell">
+              <span>Avg trades → blow</span>
+              <b>${v.avg_trades_to_blow == null ? "—" : Number(v.avg_trades_to_blow).toFixed(1)}</b>
+            </div>
+          </div>
+          <div class="mc-actual">
+            Actual path: <b class="${v.actual_final_return_pct >= 0 ? 'pos' : 'neg'}">${pctv(v.actual_final_return_pct)}</b> final return ·
+            <b class="neg">−${Math.abs(v.actual_max_drawdown_pct).toFixed(2)}%</b> max drawdown
+          </div>
+          <div class="mc-hist-wrap">
+            <canvas class="mc-hist" id="mcHist_${mode}"></canvas>
+          </div>
+        </div>`;
+    });
+    $("mcVariants").innerHTML = blockHtml;
+
+    panel.style.display = "";
+    if (empty) empty.style.display = "none";
+    mcTooltip.style.display = "none";
+
+    ["shuffle", "bootstrap"].forEach(mode => {
+      const v = variants[mode];
+      if (!v) return;
+      drawMcHistogram($("mcHist_" + mode), v.trades_histogram);
+    });
+  }
+
+  function drawMcHistogram(canvas, hist){
+    const ctx = canvas.getContext("2d");
+    mcTooltip.style.display = "none";
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(240, rect.width || canvas.parentElement.clientWidth || 420);
+    const h = 240;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.height = h + "px";
+
+    const pad = { l: 10, r: 10, t: 12, b: 24 };
+    const plotW = w - pad.l - pad.r;
+    const plotH = h - pad.t - pad.b;
+
+    const state = { ctx, w, h, dpr, pad, plotW, plotH, hist: hist || [], barX: [], barY: [], barW: [], hover: null };
+    const render = (hover) => {
+      state.barX = []; state.barY = []; state.barW = [];
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      if (!state.hist.length){
+        ctx.fillStyle = "#565f70";
+        ctx.font = "12px 'JetBrains Mono'";
+        ctx.fillText("No distribution to plot", 16, h / 2);
+        return;
+      }
+
+      const maxC = Math.max(...state.hist.map(b => b[1] + b[2] + b[3]), 1);
+      const n = state.hist.length;
+      const bw = plotW / n;
+
+      state.hist.forEach(([center, passed, blew, neither], i) => {
+        const total = passed + blew + neither;
+        const x = pad.l + i * bw + bw * 0.09;
+        const barW = bw * 0.82;
+        const hot = i === hover;
+        if (total === 0){
+          state.barX.push(x); state.barY.push(pad.t + plotH); state.barW.push(barW);
+          return;
+        }
+        const fullH = (total / maxC) * plotH;
+        const yTop = pad.t + plotH - fullH;
+        state.barX.push(x); state.barY.push(yTop); state.barW.push(barW);
+        let y = yTop;
+        const seg = (h, fill, bright) => {
+          if (h <= 0) return;
+          ctx.fillStyle = hot ? bright : fill;
+          ctx.fillRect(x, y, barW, h);
+          y += h;
+        };
+        // top to bottom: ran-all (gold) -> blown (red) -> passed (green)
+        seg(fullH * (neither / total), "rgba(201,161,59,0.5)", "rgba(224,185,74,0.9)");
+        seg(fullH * (blew / total), "rgba(193,88,78,0.55)", "rgba(217,114,103,0.95)");
+        seg(fullH * (passed / total), "rgba(107,197,147,0.55)", "rgba(107,197,147,0.95)");
+        if (hot){
+          ctx.strokeStyle = "#c9a13b";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x, yTop, barW, fullH);
+        }
+      });
+
+      ctx.strokeStyle = "#8a93a6";
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(pad.l, pad.t + plotH);
+      ctx.lineTo(pad.l + plotW, pad.t + plotH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const step = n <= 12 ? 1 : n <= 25 ? 5 : n <= 60 ? 10 : n <= 120 ? 20 : 50;
+      ctx.fillStyle = "#68718a";
+      ctx.font = "9px 'JetBrains Mono'";
+      ctx.textAlign = "center";
+      state.hist.forEach(([center], i) => {
+        if (center % step === 0 || i === n - 1){
+          ctx.fillText(String(center), pad.l + i * bw + bw * 0.5, h - 10);
+        }
+      });
+      ctx.fillText("trades taken", pad.l + plotW / 2, h - 3);
+      ctx.textAlign = "left";
+    };
+
+    state.render = render;
+    canvas._mcHist = state;
+    render(null);
+
+    canvas.onmousemove = (e) => {
+      const st = canvas._mcHist;
+      if (!st || !st.hist.length || !st.barX.length) return;
+      const crect = canvas.getBoundingClientRect();
+      const mx = e.clientX - crect.left;
+      let hit = -1;
+      for (let k = 0; k < st.barX.length; k++){
+        if (mx >= st.barX[k] - 1 && mx <= st.barX[k] + st.barW[k] + 1){ hit = k; break; }
+      }
+      if (hit < 0){
+        if (st.hover !== null){ st.hover = null; st.render(null); }
+        mcTooltip.style.display = "none";
+        return;
+      }
+      const [center, passed, blew, neither] = st.hist[hit];
+      if (passed + blew + neither === 0){
+        if (st.hover !== null){ st.hover = null; st.render(null); }
+        mcTooltip.style.display = "none";
+        return;
+      }
+      if (st.hover !== hit){
+        st.hover = hit;
+        st.render(hit);
+      }
+      const total = passed + blew + neither;
+      mcTooltip.innerHTML =
+        `<div class="tt-date">trades taken</div>` +
+        `<div class="tt-r">${center} trades</div>` +
+        `<div class="tt-r">${total.toLocaleString()} accounts</div>` +
+        `<div class="tt-r pos">${passed.toLocaleString()} passed</div>` +
+        `<div class="tt-r neg">${blew.toLocaleString()} blown</div>` +
+        (neither > 0 ? `<div class="tt-r">${neither.toLocaleString()} ran all trades</div>` : "");
+      const prect = $("mcPanel").getBoundingClientRect();
+      const cx = e.clientX - prect.left;
+      const cy = e.clientY - prect.top;
+      mcTooltip.style.left = (cx > prect.width - 150 ? cx - 168 : cx + 14) + "px";
+      mcTooltip.style.top = Math.max(4, cy - 14) + "px";
+      mcTooltip.style.display = "block";
+    };
+
+    canvas.onmouseleave = () => {
+      const st = canvas._mcHist;
+      if (!st) return;
+      st.hover = null;
+      st.render(null);
+      mcTooltip.style.display = "none";
+    };
   }
 
   function renderAll(){
@@ -941,11 +1252,14 @@
 
       currentJobId = data.job_id;
       lastResult = data;
+      lastMc = null;
       calendarMonth = null;
       yearNav = null;
 
       $("emptyState").style.display = "none";
       $("resultsSection").style.display = "flex";
+      renderMc();
+      $("btnMonteCarlo").disabled = false;
 
       await refreshSim();
     } catch(e){
@@ -987,12 +1301,29 @@
     });
   });
 
+  // Global view switch: Backtest / Monte Carlo pages
+  const mainTabs = document.querySelectorAll("#mainTabs .main-tab");
+  const gpages = document.querySelectorAll(".gpage");
+  mainTabs.forEach(btn => {
+    btn.addEventListener("click", () => {
+      mainTabs.forEach(b => {
+        const active = b === btn;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      gpages.forEach(p => {
+        p.classList.toggle("active", p.dataset.gpage === btn.dataset.gtab);
+      });
+    });
+  });
+
   // Wire up events
   $("fileUpload").addEventListener("change", handleUpload);
   $("btnGenerate").addEventListener("click", handleGenerate);
   $("btnClear").addEventListener("click", handleClear);
   $("btnBundled").addEventListener("click", handleBundled);
   $("btnExport").addEventListener("click", handleExport);
+  $("btnMonteCarlo").addEventListener("click", runMonteCarlo);
 
   async function loadBundledLabel(){
     const label = $("bundledLabel");
@@ -1094,6 +1425,12 @@
   tooltip.className = "chart-tooltip";
   equityCanvas.closest(".chart-panel").appendChild(tooltip);
 
+  // Monte Carlo histogram hover: tooltip with the trade bucket + account count
+  const mcTooltip = document.createElement("div");
+  mcTooltip.className = "chart-tooltip";
+  const mcPanelEl = $("mcPanel");
+  if (mcPanelEl) mcPanelEl.appendChild(mcTooltip);
+
   equityCanvas.addEventListener("mousemove", (e) => {
     if (!equityState) return;
     const rect = equityCanvas.getBoundingClientRect();
@@ -1165,8 +1502,12 @@
   });
 
   window.addEventListener("resize", () => {
-    if ($("resultsSection").style.display !== "none"){
-      // no-op: chart redraws on next generate; acceptable for v1
+    const mcPanelEl = $("mcPanel");
+    if (mcPanelEl && mcPanelEl.style.display !== "none"){
+      ["shuffle", "bootstrap"].forEach(mode => {
+        const c = $("mcHist_" + mode);
+        if (c && c._mcHist && c._mcHist.hist.length) drawMcHistogram(c, c._mcHist.hist);
+      });
     }
   });
 

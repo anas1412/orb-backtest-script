@@ -26,6 +26,13 @@
     </div>
   </header>
 
+  <nav class="main-tabs" id="mainTabs" role="tablist" aria-label="Views">
+    <button class="main-tab active" data-gtab="backtest" role="tab" aria-selected="true"><i data-lucide="chart-candlestick"></i>Backtest</button>
+    <button class="main-tab" data-gtab="montecarlo" role="tab" aria-selected="false"><i data-lucide="dices"></i>Monte Carlo</button>
+  </nav>
+
+  <div class="gpage active" data-gpage="backtest">
+
   <div class="layout">
 
     <!-- LEFT: Params -->
@@ -324,6 +331,96 @@
       </section>
 
     </main>
+  </div>
+
+  </div>
+
+  <div class="gpage" data-gpage="montecarlo">
+
+    <div class="layout">
+
+      <aside class="panel params-panel">
+        <div class="panel-header">
+          <h2>Monte Carlo</h2>
+        </div>
+        <section class="group">
+          <h3 class="group-title">Resampling</h3>
+          <p class="hint">Each account is one simulated run of the strategy. Monte Carlo resamples the trade outcomes and follows every account trade by trade until it reaches the target or blows (breaches the drawdown limit) — whichever comes first.</p>
+          <div class="field-grid">
+            <label class="field">
+              <span>Accounts to test</span>
+              <input type="number" id="mcIterations" value="{{ defaults.montecarlo_iterations }}" min="1" max="10000" step="1">
+            </label>
+            <label class="field">
+              <span>Random seed</span>
+              <input type="number" id="mcSeed" min="0" step="1" {% if defaults.montecarlo_seed is not none %}value="{{ defaults.montecarlo_seed }}"{% endif %} placeholder="random">
+            </label>
+          </div>
+          <label class="field">
+            <span>Resampling</span>
+            <select id="mcSampleMode">
+              <option value="both" {% if defaults.montecarlo_sample_mode == 'both' %}selected{% endif %}>Both — shuffle + bootstrap</option>
+              <option value="shuffle" {% if defaults.montecarlo_sample_mode == 'shuffle' %}selected{% endif %}>Shuffle — randomize trade order</option>
+              <option value="bootstrap" {% if defaults.montecarlo_sample_mode == 'bootstrap' %}selected{% endif %}>Bootstrap — resample with replacement</option>
+            </select>
+          </label>
+          <p class="hint">Each account runs random trades until it hits a boundary — reaching the target counts as passed, breaching the drawdown limit counts as blown — and it pauses there. No account is evaluated past its own +target% or −max&nbsp;dd%.</p>
+        </section>
+        <section class="group">
+          <h3 class="group-title">Capital basis</h3>
+          <div class="field-grid">
+            <label class="field">
+              <span>Initial capital ($)</span>
+              <input type="number" id="mcCapital" value="{{ defaults.montecarlo_capital }}" min="1" step="100">
+            </label>
+            <label class="field">
+              <span>Risk per trade (%)</span>
+              <input type="number" id="mcRiskPct" value="{{ defaults.montecarlo_risk_pct }}" min="0.01" max="9.99" step="0.1">
+            </label>
+          </div>
+          <label class="field">
+            <span>Risk basis</span>
+            <select id="mcSizing">
+              <option value="fixed" {% if defaults.montecarlo_sizing == 'fixed' %}selected{% endif %}>Fixed — % of initial capital</option>
+              <option value="compounding" {% if defaults.montecarlo_sizing == 'compounding' %}selected{% endif %}>Compounding — % of current equity</option>
+            </select>
+          </label>
+          <div class="field-grid">
+            <label class="field">
+              <span>Target return (%)</span>
+              <input type="number" id="mcTargetPct" value="{{ defaults.montecarlo_target_pct }}" min="0.01" step="0.1">
+            </label>
+            <label class="field">
+              <span>Max drawdown (%)</span>
+              <input type="number" id="mcMaxDdPct" value="{{ defaults.montecarlo_max_dd_pct }}" min="0.01" step="0.1">
+            </label>
+          </div>
+          <p class="hint"><b>Target return</b>: % of initial capital you want back. <b>Max drawdown</b>: how deep the account may draw down before you'd stop. The report shows the chance of reaching the target and the chance of staying inside the drawdown limit.</p>
+        </section>
+        <div class="bottom-actions">
+          <button class="btn btn-primary" id="btnMonteCarlo" type="button" disabled>
+            <i data-lucide="dices"></i><span class="btn-label">Run Monte Carlo</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="empty-state" id="mcEmptyState">
+          <div class="empty-mark"><i data-lucide="dices"></i></div>
+          <p>No Monte Carlo results yet. Run a backtest first, then press Run Monte Carlo to see how the account outcomes spread out.</p>
+        </section>
+        <section class="panel mc-panel" id="mcPanel" style="display:none;">
+          <div class="panel-header">
+            <h2>Monte Carlo outcomes</h2>
+            <span class="panel-sub" id="mcModeLabel"></span>
+          </div>
+          <div class="mc-summary" id="mcSummary"></div>
+          <div class="mc-variants" id="mcVariants"></div>
+        </section>
+      </main>
+
+    </div>
+
   </div>
 </div>
 
