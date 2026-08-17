@@ -5,8 +5,11 @@ import io
 import json
 import queue
 import re
+import tempfile
 import threading
+import time
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -14,10 +17,11 @@ from typing import Literal, Optional
 
 import pandas as pd
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, model_validator
+from starlette.background import BackgroundTask
 
 from app.engine.data_loader import (
     load_ohlcv_csv, merge_loaded, DataValidationError, LoadedData
@@ -29,6 +33,7 @@ from app.engine.stats import (
 )
 from app.engine.montecarlo import run_monte_carlo
 from app.defaults import DEFAULTS
+from app.trade_images import build_trade_images_zip
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -47,12 +52,6 @@ def _normalize_date(value: str, field: str) -> str:
         return v
     raise HTTPException(status_code=400, detail=f"{field}: could not parse '{v}' (use DD/MM/YYYY or YYYY-MM-DD)")
 
-app = FastAPI(title="Gold Asia Range Breakout Backtester")
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
-templates = Jinja2Templates(directory=BASE_DIR / "templates")
-
-
-@app.middleware("http")
 async def no_cache_static_assets(request: Request, call_next):
     """Static JS/CSS change often during development; force revalidation so a
     cached page never runs stale assets."""
@@ -64,6 +63,92 @@ async def no_cache_static_assets(request: Request, call_next):
 # In-memory store: single-user local tool, simple dict is enough.
 DATA_STORE: dict[str, LoadedData] = {}
 RESULT_STORE: dict[str, BacktestResult] = {}
+# job_id -> dataset_id the backtest ran over (needed to slice candles for images).
+JOB_DATASET: dict[str, str] = {}
+# job_id -> ImageExport: per-trade chart ZIP builds, single-use by design.
+IMAGE_STORE: dict[str, "ImageExport"] = {}
+IMAGE_TTL_SECONDS = 30 * 60  # stale (undownloaded) exports are swept away
+
+
+class ImageExport:
+    """State of one per-trade chart ZIP being rendered in a background thread."""
+
+    __slots__ = ("dataset_id", "status", "total", "done", "error", "path", "created_at")
+
+    def __init__(self, dataset_id: str):
+        self.dataset_id = dataset_id
+        self.status = "generating"
+        self.total = 0
+        self.done = 0
+        self.error: str | None = None
+        self.path: Path | None = None
+        self.created_at = time.time()
+
+
+def _image_temp_dir() -> Path:
+    d = Path(tempfile.gettempdir()) / "orb_trade_images"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _image_file_for(job_id: str) -> Path:
+    return _image_temp_dir() / f"trade_charts_{job_id}.zip"
+
+
+def _drop_image_export(job_id: str) -> None:
+    """Remove the export record and unlink its zip from disk, if any."""
+    job = IMAGE_STORE.pop(job_id, None)
+    if job is not None and job.path is not None:
+        try:
+            job.path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _sweep_stale_images() -> None:
+    now = time.time()
+    for job_id in list(IMAGE_STORE):
+        job = IMAGE_STORE[job_id]
+        if now - job.created_at > IMAGE_TTL_SECONDS:
+            _drop_image_export(job_id)
+
+
+def _purge_jobs_for_dataset(dataset_id: str) -> None:
+    dead = [jid for jid, did in JOB_DATASET.items() if did == dataset_id]
+    for jid in dead:
+        RESULT_STORE.pop(jid, None)
+        JOB_DATASET.pop(jid, None)
+        _drop_image_export(jid)
+
+
+def _image_export_payload(job_id: str, job: ImageExport) -> dict:
+    return {
+        "job_id": job_id,
+        "status": job.status,
+        "total": job.total,
+        "done": job.done,
+        "percent": round(job.done / job.total * 100) if job.total else 0,
+        "error": job.error,
+        "download_url": f"/api/backtest/images/{job_id}/download",
+    }
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """On boot, clear any leftover export zips from a previous process."""
+    d = _image_temp_dir()
+    for f in d.glob("trade_charts_*.zip"):
+        try:
+            f.unlink()
+        except OSError:
+            pass
+    yield
+
+
+app = FastAPI(title="Gold Asia Range Breakout Backtester", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
+app.middleware("http")(no_cache_static_assets)
 
 
 class BacktestParams(BaseModel):
@@ -257,6 +342,8 @@ async def delete_dataset(dataset_id: str):
     if dataset_id not in DATA_STORE:
         raise HTTPException(status_code=404, detail="Dataset not found")
     del DATA_STORE[dataset_id]
+    # Cascade: drop any backtest results and chart exports that depended on it.
+    _purge_jobs_for_dataset(dataset_id)
     return {"ok": True, "dataset_id": dataset_id}
 
 
@@ -306,6 +393,7 @@ async def run_backtest_endpoint(p: BacktestParams):
             result = run_backtest(df, params, progress_cb=on_progress)
             job_id = str(uuid.uuid4())
             RESULT_STORE[job_id] = result
+            JOB_DATASET[job_id] = p.dataset_id
             q.put({"type": "done", "result": _serialize_result(result, job_id, loaded, p)})
         except Exception as exc:  # defensive: surface any engine failure to the UI
             q.put({"type": "error", "detail": str(exc)})
@@ -353,6 +441,7 @@ def _serialize_result(result: BacktestResult, job_id: str, loaded: LoadedData, p
 
     return {
         "job_id": job_id,
+        "dataset_id": p.dataset_id,
         "symbol": loaded.symbol,
         "params": p.dict(),
         "stats": {
@@ -475,4 +564,88 @@ async def export_trades_csv(
         iter([buf.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=trades_{job_id}.csv"},
+    )
+
+
+@app.post("/api/backtest/images/{job_id}")
+async def export_trade_images(job_id: str):
+    """Start (or return an in-flight) per-trade chart ZIP build.
+
+    Renders one candle chart per trade in a background thread, writing the
+    ZIP straight to a temp file on disk. The caller polls /status until
+    `ready`, downloads once via /download, and the file is unlinked
+    immediately after the response is sent — nothing persists on the server.
+    """
+    result = RESULT_STORE.get(job_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Backtest result not found.")
+    if len(result.trades) == 0:
+        raise HTTPException(status_code=400, detail="This backtest has no trades — nothing to chart.")
+    dataset_id = JOB_DATASET.get(job_id)
+    loaded = DATA_STORE.get(dataset_id) if dataset_id else None
+    if loaded is None:
+        raise HTTPException(
+            status_code=400,
+            detail="The dataset for this backtest is no longer loaded. Re-run the backtest, then export charts.",
+        )
+    if result.params is None:
+        raise HTTPException(status_code=400, detail="Backtest params are missing; re-run the backtest.")
+
+    existing = IMAGE_STORE.get(job_id)
+    if existing is not None and existing.status in ("generating", "ready"):
+        return _image_export_payload(job_id, existing)
+
+    _sweep_stale_images()
+    job = ImageExport(dataset_id)
+    IMAGE_STORE[job_id] = job
+
+    def worker() -> None:
+        out = _image_file_for(job_id)
+        try:
+            build_trade_images_zip(
+                loaded.df,
+                result.trades,
+                result.params,
+                out,
+                progress_cb=lambda done, total: (setattr(job, "done", done), setattr(job, "total", total)),
+            )
+            job.path = out
+            job.status = "ready"
+        except Exception as exc:  # defensive: surface any rendering failure
+            job.error = str(exc)
+            job.status = "error"
+            try:
+                out.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    threading.Thread(target=worker, daemon=True).start()
+    return _image_export_payload(job_id, job)
+
+
+@app.get("/api/backtest/images/{job_id}/status")
+async def trade_images_status(job_id: str):
+    job = IMAGE_STORE.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="No chart export is in progress for this job.")
+    return _image_export_payload(job_id, job)
+
+
+@app.get("/api/backtest/images/{job_id}/download")
+async def download_trade_images(job_id: str):
+    job = IMAGE_STORE.get(job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No chart export is available. It may have been downloaded already or expired — start a new export.",
+        )
+    if job.status == "error":
+        raise HTTPException(status_code=500, detail=job.error or "Chart export failed.")
+    if job.status != "ready" or job.path is None or not job.path.exists():
+        raise HTTPException(status_code=409, detail="Charts are still being rendered. Poll /status and retry.")
+    return FileResponse(
+        job.path,
+        media_type="application/zip",
+        filename=f"trade_charts_{job_id}.zip",
+        background=BackgroundTask(_drop_image_export, job_id),
     )

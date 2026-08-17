@@ -335,6 +335,7 @@
     $("btnGenerate").disabled = true;
     $("btnClear").disabled = true;
     $("btnMonteCarlo").disabled = true;
+    $("btnExportImages").disabled = true;
     $("datasetMeta").innerHTML = "No dataset loaded";
     setStatus("No dataset loaded", false);
     $("resultsSection").style.display = "none";
@@ -1269,6 +1270,7 @@
       $("resultsSection").style.display = "flex";
       renderMc();
       $("btnMonteCarlo").disabled = false;
+      $("btnExportImages").disabled = false;
 
       await refreshSim();
     } catch(e){
@@ -1290,6 +1292,85 @@
       window.location.href = `/api/backtest/export/${currentJobId}?capital=1&initial_capital=${cap.initial_capital}&risk_pct=${cap.risk_pct}&mode=${cap.mode}`;
     } else {
       window.location.href = `/api/backtest/export/${currentJobId}`;
+    }
+  }
+
+  let exportingImages = false;
+
+  async function downloadChartsBlob(jobId){
+    const res = await fetch(`/api/backtest/images/${jobId}/download`);
+    if (!res.ok){
+      let detail = "Chart download failed";
+      try { const e = await res.json(); detail = e.detail || detail; } catch(_){ /* keep default */ }
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get("content-disposition") || "";
+    const m = cd.match(/filename="?([^";]+)"?/i);
+    const filename = m ? m[1] : `trade_charts_${jobId}.zip`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  async function handleExportImages(){
+    if (!currentJobId || exportingImages) return;
+    const btn = $("btnExportImages");
+    const wrap = $("imagesProgress");
+    const bar = $("imagesProgressBar");
+    const label = $("imagesProgressLabel");
+    btn.disabled = true;
+    wrap.hidden = false;
+    bar.style.width = "2%";
+    label.textContent = "Preparing charts…";
+    exportingImages = true;
+    try{
+      const res = await fetch(`/api/backtest/images/${currentJobId}`, { method: "POST" });
+      if (!res.ok){
+        const err = await res.json();
+        throw new Error(err.detail || "Chart export failed");
+      }
+      const meta = await res.json();
+      if (meta.status === "ready"){
+        await downloadChartsBlob(currentJobId);
+        showToast("Charts downloaded", "Per-trade chart ZIP saved. The server copy was removed.", "success");
+        return;
+      }
+      const t0 = performance.now();
+      for(;;){
+        await new Promise(r => setTimeout(r, 500));
+        const sres = await fetch(`/api/backtest/images/${currentJobId}/status`);
+        if (!sres.ok){
+          const err = await sres.json();
+          throw new Error(err.detail || "Chart export failed");
+        }
+        const st = await sres.json();
+        const pct = st.total ? Math.min(99, Math.round(st.done / st.total * 100)) : 0;
+        bar.style.width = pct + "%";
+        label.textContent = `Rendering charts… ${pct}% · ${fmtElapsed(performance.now() - t0)}`;
+        if (st.status === "ready"){
+          bar.style.width = "100%";
+          label.textContent = "Downloading…";
+          await downloadChartsBlob(currentJobId);
+          showToast("Charts downloaded", "Per-trade chart ZIP saved. The server copy was removed.", "success");
+          return;
+        }
+        if (st.status === "error"){
+          throw new Error(st.error || "Chart export failed");
+        }
+      }
+    } catch(e){
+      showToast("Chart export failed", friendlyError(e.message), "error");
+    } finally {
+      exportingImages = false;
+      btn.disabled = false;
+      wrap.hidden = true;
+      bar.style.width = "0%";
     }
   }
 
@@ -1332,6 +1413,7 @@
   $("btnClear").addEventListener("click", handleClear);
   $("btnBundled").addEventListener("click", handleBundled);
   $("btnExport").addEventListener("click", handleExport);
+  $("btnExportImages").addEventListener("click", handleExportImages);
   $("btnMonteCarlo").addEventListener("click", runMonteCarlo);
 
   async function loadBundledLabel(){

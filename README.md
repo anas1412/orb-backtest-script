@@ -74,6 +74,9 @@ source's raw timestamp timezone before uploading.
 - `POST /api/backtest/simulate/{job_id}` — size the trade log onto a dollar account (see below)
 - `POST /api/backtest/montecarlo/{job_id}` — Monte Carlo across resampled trade orders (see below)
 - `GET /api/backtest/export/{job_id}` — download the trade log as CSV; optional query params `capital=1&initial_capital=10000&risk_pct=1&mode=fixed|compounding` add a `pnl_usd` column
+- `POST /api/backtest/images/{job_id}` — build a ZIP of one candlestick chart per trade (background thread, poll `/status` then download once)
+- `GET /api/backtest/images/{job_id}/status` — render progress (`generating` → `ready`); `done`/`total` give the percent
+- `GET /api/backtest/images/{job_id}/download` — stream the charts ZIP; the file is deleted from the server the moment the download completes (single-use, a second download 404s)
 
 ## Capital simulation
 
@@ -129,6 +132,27 @@ halted at its max loss), and the remainder ran all trades without hitting
 either. No account can report a return past its own boundary. Also note
 shuffle preserves the sum of R, so for fixed sizing its drawdown spread is
 the informative output; bootstrap's goal is edge robustness.
+
+## Per-trade chart export
+
+The **Export charts (.zip)** button next to the trade log downloads one PNG
+per closed trade, packed into a ZIP. Each chart shows that trade's candle
+window in the dashboard's dark palette: the opening-range band (high/low),
+the breakout bar, the session-open and search-deadline markers, the entry,
+initial SL, moved SL (when the ladder advanced) and TP levels, and an exit
+marker, plus a header with date, direction, entry mode, entry→exit times, exit
+reason and the R outcome. The ZIP also contains a `trades.csv` manifest.
+
+- Like the capital sim and Monte Carlo, charts are a pure post-process over
+  the loaded candles + trade log — the backtest is never re-run.
+- Generated in a background thread into a temp file (progress is pollable via
+  `/api/backtest/images/{job_id}/status`), streamed on download, then
+  **unlinked immediately after the response is sent**. Nothing persists on the
+  server: a second download 404s, stale undownloaded exports are swept after
+  30 minutes, and anything left on disk is cleared at app startup.
+- Exports are capped at 5,000 charts (the manifest covers the full log).
+- Deleting a dataset drops the backtest results and chart exports that
+  depended on it.
 
 ## Verified behavior (tested during build)
 

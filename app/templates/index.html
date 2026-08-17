@@ -301,7 +301,14 @@
         <div class="panel trade-panel">
           <div class="panel-header">
             <h2>Trade log</h2>
-            <button class="btn btn-ghost" id="btnExport" type="button"><i data-lucide="download"></i>Export CSV</button>
+            <div class="panel-actions">
+              <button class="btn btn-ghost" id="btnExport" type="button"><i data-lucide="download"></i>Export CSV</button>
+              <button class="btn btn-ghost" id="btnExportImages" type="button" disabled title="One candle chart per trade, packaged as a ZIP and removed from the server after download"><i data-lucide="images"></i>Export charts (.zip)</button>
+            </div>
+          </div>
+          <div class="export-progress" id="imagesProgress" hidden>
+            <div class="progress-track"><div class="progress-bar" id="imagesProgressBar"></div></div>
+            <span class="progress-label" id="imagesProgressLabel">Preparing charts…</span>
           </div>
           <div class="table-wrap">
             <table id="tradeTable">

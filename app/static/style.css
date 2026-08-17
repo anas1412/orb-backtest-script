@@ -150,6 +150,7 @@ body{
   color: var(--text-dim); font-weight:600; margin:0;
 }
 .panel-sub{ font-family: var(--font-mono); font-size:11px; color: var(--text-faint); }
+.panel-actions{ display:flex; align-items:center; gap: 8px; }
 
 /* ---------- Sidebar tabs ---------- */
 .tabs{
@@ -635,6 +636,15 @@ body{
 
 /* ---------- Table ---------- */
 .trade-panel{ padding: 18px 22px; }
+.export-progress{
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-raised);
+}
+.export-progress .progress-track{ margin-top: 0; }
+.export-progress .progress-label{ margin-top: 6px; }
 .trade-panel .table-wrap{
   overflow-x:auto;
   margin: 0 -23px -19px -23px;
